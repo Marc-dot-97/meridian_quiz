@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "SiNAOi34Q6E=",
+  "dgSpecHash": "nr0smlQ/3x0=",
   "success": true,
   "projectFilePath": "C:\\Users\\MarcBreedt\\OneDrive - Optimum\\Desktop\\meridianApp\\src\\Meridian.Api\\Meridian.Api.csproj",
   "expectedPackageFiles": [
@@ -14,7 +14,6 @@
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.azure.security.keyguardattestation\\1.1.5\\microsoft.azure.security.keyguardattestation.1.1.5.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\8.0.0\\microsoft.bcl.asyncinterfaces.8.0.0.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.bcl.cryptography\\10.0.2\\microsoft.bcl.cryptography.10.0.2.nupkg.sha512",
-    "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.extensions.apidescription.server\\6.0.5\\microsoft.extensions.apidescription.server.6.0.5.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.identity.abstractions\\12.6.0\\microsoft.identity.abstractions.12.6.0.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.identity.client\\4.87.0\\microsoft.identity.client.4.87.0.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.identity.client.extensions.msal\\4.83.1\\microsoft.identity.client.extensions.msal.4.83.1.nupkg.sha512",
@@ -34,10 +33,6 @@
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.identitymodel.tokens\\8.22.0\\microsoft.identitymodel.tokens.8.22.0.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.identitymodel.validators\\8.22.0\\microsoft.identitymodel.validators.8.22.0.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512",
-    "C:\\Users\\MarcBreedt\\.nuget\\packages\\swashbuckle.aspnetcore\\6.7.0\\swashbuckle.aspnetcore.6.7.0.nupkg.sha512",
-    "C:\\Users\\MarcBreedt\\.nuget\\packages\\swashbuckle.aspnetcore.swagger\\6.7.0\\swashbuckle.aspnetcore.swagger.6.7.0.nupkg.sha512",
-    "C:\\Users\\MarcBreedt\\.nuget\\packages\\swashbuckle.aspnetcore.swaggergen\\6.7.0\\swashbuckle.aspnetcore.swaggergen.6.7.0.nupkg.sha512",
-    "C:\\Users\\MarcBreedt\\.nuget\\packages\\swashbuckle.aspnetcore.swaggerui\\6.7.0\\swashbuckle.aspnetcore.swaggerui.6.7.0.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\system.clientmodel\\1.8.0\\system.clientmodel.1.8.0.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.22.0\\system.identitymodel.tokens.jwt.8.22.0.nupkg.sha512",
     "C:\\Users\\MarcBreedt\\.nuget\\packages\\system.memory.data\\8.0.1\\system.memory.data.8.0.1.nupkg.sha512",

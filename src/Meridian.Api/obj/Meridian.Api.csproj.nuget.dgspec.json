@@ -60,10 +60,6 @@
             "Microsoft.Identity.Web": {
               "target": "Package",
               "version": "[4.14.2, )"
-            },
-            "Swashbuckle.AspNetCore": {
-              "target": "Package",
-              "version": "[6.7.0, )"
             }
           },
           "imports": [
