@@ -1,0 +1,56 @@
+@page "/quizzes"
+@attribute [Authorize]
+@inject MeridianApiClient Api
+
+<PageTitle>Quizzes | Meridian</PageTitle>
+
+<div class="page">
+    <header class="dash-topbar">
+        <div class="dash-brand">Meridian</div>
+        <LoginDisplay />
+    </header>
+
+    <section class="dashboard-copy">
+        <span class="section-kicker">Quiz Library</span>
+        <h1>Choose a quiz</h1>
+        <p>Each attempt receives a random set of questions.</p>
+    </section>
+
+    @if (_loading)
+    {
+        <LoadingPanel Message="Loading quizzes..." />
+    }
+    else if (_error is not null)
+    {
+        <ErrorPanel Message="@_error" />
+    }
+    else
+    {
+        <div class="quiz-list full-width">
+            @foreach (var quiz in _quizzes)
+            {
+                <article class="quiz-card">
+                    <div class="quiz-info">
+                        <div><span class="quiz-tag">@quiz.Category</span></div>
+                        <div class="quiz-title">@quiz.Title</div>
+                        <div class="quiz-meta">@quiz.QuestionsPerAttempt questions · @quiz.PassMarkPercent% pass · @quiz.CpdPoints CPD</div>
+                    </div>
+                    <a class="quiz-start" href="@($"quizzes/{quiz.Id}")">View</a>
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<QuizSummaryDto> _quizzes = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _quizzes = await Api.GetQuizzesAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

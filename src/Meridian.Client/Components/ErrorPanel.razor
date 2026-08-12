@@ -1,0 +1,9 @@
+<div class="error-panel" role="alert">
+    <strong>Something went wrong</strong>
+    <span>@Message</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Message { get; set; } = string.Empty;
+}

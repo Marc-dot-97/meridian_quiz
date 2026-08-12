@@ -1,0 +1,43 @@
+@page "/progress"
+@attribute [Authorize]
+@inject MeridianApiClient Api
+
+<PageTitle>Progress | Meridian</PageTitle>
+
+<div class="page">
+    <header class="dash-topbar"><div class="dash-brand">Progress</div><LoginDisplay /></header>
+    @if (_loading)
+    {
+        <LoadingPanel Message="Loading progress..." />
+    }
+    else if (_error is not null)
+    {
+        <ErrorPanel Message="@_error" />
+    }
+    else if (_progress is not null)
+    {
+        <section class="progress-summary">
+            <span class="section-kicker">Current level</span>
+            <div class="big-level">@_progress.CurrentLevel</div>
+            <p>@_progress.TotalXp total XP</p>
+        </section>
+        <div class="detail-grid full-width">
+            <div><span>Completed</span><strong>@_progress.QuizzesCompleted</strong></div>
+            <div><span>Passed</span><strong>@_progress.QuizzesPassed</strong></div>
+            <div><span>Streak</span><strong>@_progress.CurrentStreak</strong></div>
+            <div><span>Best streak</span><strong>@_progress.LongestStreak</strong></div>
+        </div>
+    }
+</div>
+
+@code {
+    private UserProgressDto? _progress;
+    private bool _loading = true;
+    private string? _error;
+    protected override async Task OnInitializedAsync()
+    {
+        try { _progress = await Api.GetMyProgressAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

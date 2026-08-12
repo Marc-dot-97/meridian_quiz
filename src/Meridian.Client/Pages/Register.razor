@@ -1,0 +1,186 @@
+@page "/register"
+@layout AuthLayout
+@using System.ComponentModel.DataAnnotations
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+@inject LocalAccountService LocalAccounts
+
+<PageTitle>Register | Meridian</PageTitle>
+
+<div class="login-screen register-screen">
+    <svg class="login-ambient-arc" viewBox="0 0 700 300" aria-hidden="true">
+        <ellipse cx="350" cy="70" rx="300" ry="190" fill="none" stroke="currentColor" stroke-width="2" />
+        <ellipse cx="350" cy="70" rx="245" ry="145" fill="none" stroke="currentColor" stroke-width="1" />
+    </svg>
+
+    <section class="login-content auth-card auth-card-wide">
+        <p class="auth-eyebrow">CREATE YOUR PROFILE</p>
+        <h1 class="login-wordmark">Join Meridian</h1>
+        <p class="login-tagline">Create your learning profile so your quiz progress and CPD activity can be linked to you.</p>
+
+        <EditForm Model="Model" OnValidSubmit="HandleRegister" class="auth-form">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="auth-error" role="alert">@_error</div>
+            }
+
+            <div class="auth-grid">
+                <div class="auth-field">
+                    <label for="first-name">First name</label>
+                    <InputText id="first-name" class="auth-input" @bind-Value="Model.FirstName" autocomplete="given-name" />
+                    <ValidationMessage For="@(() => Model.FirstName)" />
+                </div>
+
+                <div class="auth-field">
+                    <label for="surname">Surname</label>
+                    <InputText id="surname" class="auth-input" @bind-Value="Model.Surname" autocomplete="family-name" />
+                    <ValidationMessage For="@(() => Model.Surname)" />
+                </div>
+            </div>
+
+            <div class="auth-field">
+                <label for="register-email">Work email address</label>
+                <InputText id="register-email" class="auth-input" @bind-Value="Model.Email" autocomplete="email" />
+                <ValidationMessage For="@(() => Model.Email)" />
+            </div>
+
+            <div class="auth-grid">
+                <div class="auth-field">
+                    <label for="department">Department</label>
+                    <InputText id="department" class="auth-input" @bind-Value="Model.Department" />
+                    <ValidationMessage For="@(() => Model.Department)" />
+                </div>
+
+                <div class="auth-field">
+                    <label for="line-manager">Line manager</label>
+                    <InputText id="line-manager" class="auth-input" @bind-Value="Model.LineManager" />
+                </div>
+            </div>
+
+            <div class="auth-grid">
+                <div class="auth-field">
+                    <label for="register-password">Password</label>
+                    <InputText id="register-password" class="auth-input" type="password" @bind-Value="Model.Password" autocomplete="new-password" />
+                    <ValidationMessage For="@(() => Model.Password)" />
+                </div>
+
+                <div class="auth-field">
+                    <label for="confirm-password">Confirm password</label>
+                    <InputText id="confirm-password" class="auth-input" type="password" @bind-Value="Model.ConfirmPassword" autocomplete="new-password" />
+                    <ValidationMessage For="@(() => Model.ConfirmPassword)" />
+                </div>
+            </div>
+
+            <label class="auth-checkbox">
+                <InputCheckbox @bind-Value="Model.AcceptTerms" />
+                <span>I confirm that the information above is correct.</span>
+            </label>
+            <ValidationMessage For="@(() => Model.AcceptTerms)" />
+
+            <button type="submit" class="auth-primary-btn" disabled="@_submitting">
+                @(_submitting ? "Creating account..." : "Create account")
+            </button>
+        </EditForm>
+
+        @if (!UseLocalMode)
+        {
+            <p class="login-note">The registration screen is currently a frontend form. Its production save endpoint still needs to be connected to Meridian.Api.</p>
+        }
+
+        <p class="auth-switch">
+            Already have an account?
+            <a href="login">Sign in</a>
+        </p>
+
+        <p class="login-footer">Meridian · CPD Learning Platform</p>
+    </section>
+</div>
+
+@code {
+    private readonly RegisterModel Model = new();
+    private bool UseLocalMode => Configuration.GetValue<bool>("Development:UseLocalMode");
+    private bool _submitting;
+    private string? _error;
+
+    private async Task HandleRegister()
+    {
+        _error = null;
+
+        if (!string.Equals(Model.Password, Model.ConfirmPassword, StringComparison.Ordinal))
+        {
+            _error = "The password and confirmation password do not match.";
+            return;
+        }
+
+        if (!Model.AcceptTerms)
+        {
+            _error = "Please confirm that the registration information is correct.";
+            return;
+        }
+
+        if (!UseLocalMode)
+        {
+            _error = "Production registration has not been connected to the backend yet.";
+            return;
+        }
+
+        _submitting = true;
+
+        try
+        {
+            var result = await LocalAccounts.RegisterAsync(
+                Model.FirstName,
+                Model.Surname,
+                Model.Email,
+                Model.Department,
+                Model.LineManager,
+                Model.Password);
+
+            if (!result.Success)
+            {
+                _error = result.ErrorMessage;
+                return;
+            }
+
+            Navigation.NavigateTo("/");
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private sealed class RegisterModel
+    {
+        [Required]
+        [StringLength(80)]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100)]
+        public string Surname { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100)]
+        public string Department { get; set; } = string.Empty;
+
+        [StringLength(150)]
+        public string? LineManager { get; set; }
+
+        [Required]
+        [MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Range(typeof(bool), "true", "true", ErrorMessage = "Please confirm your information.")]
+        public bool AcceptTerms { get; set; }
+    }
+}

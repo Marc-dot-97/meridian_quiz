@@ -1,0 +1,23 @@
+@page "/authentication/{Action}"
+@attribute [AllowAnonymous]
+@inject IConfiguration Configuration
+
+@if (Configuration.GetValue<bool>("Development:UseLocalMode"))
+{
+    <div class="login-screen">
+        <div class="login-content">
+            <h1 class="login-wordmark">Meridian</h1>
+            <p class="login-tagline">Local development mode is enabled. Microsoft sign-in is bypassed.</p>
+            <a class="ms-signin-btn" href="/">Continue locally</a>
+        </div>
+    </div>
+}
+else
+{
+    <RemoteAuthenticatorView Action="@Action" />
+}
+
+@code {
+    [Parameter]
+    public string? Action { get; set; }
+}

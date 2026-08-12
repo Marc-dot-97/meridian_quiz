@@ -1,0 +1,39 @@
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+@inject LocalAccountService LocalAccounts
+
+<AuthorizeView>
+    <Authorized Context="authContext">
+        <div class="dash-user">
+            <div class="dash-avatar">@Initial(authContext.User.Identity?.Name)</div>
+            <div class="dash-greeting">
+                Hello, <strong>@DisplayName(authContext.User.Identity?.Name)</strong>
+                @if (UseLocalMode)
+                {
+                    <button type="button" class="local-signout" @onclick="LocalSignOut">Sign out</button>
+                }
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <a class="quiz-start" href="login">Sign in</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private bool UseLocalMode => Configuration.GetValue<bool>("Development:UseLocalMode");
+
+    private async Task LocalSignOut()
+    {
+        await LocalAccounts.SignOutAsync();
+        Navigation.NavigateTo("/login");
+    }
+
+    private static string DisplayName(string? name)
+        => string.IsNullOrWhiteSpace(name) ? "User" : name;
+
+    private static string Initial(string? name)
+        => string.IsNullOrWhiteSpace(name)
+            ? "U"
+            : name.Trim()[0].ToString().ToUpperInvariant();
+}

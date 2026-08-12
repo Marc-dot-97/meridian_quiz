@@ -1,0 +1,17 @@
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<LoadingPanel Message="Redirecting to sign in..." />
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (Configuration.GetValue<bool>("Development:UseLocalMode"))
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        Navigation.NavigateToLogin("authentication/login");
+    }
+}

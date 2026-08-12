@@ -1,0 +1,55 @@
+@page "/leaderboard"
+@attribute [Authorize]
+@implements IDisposable
+@inject MeridianApiClient Api
+@inject LeaderboardSignalRService SignalR
+
+<PageTitle>Leaderboard | Meridian</PageTitle>
+
+<div class="page">
+    <header class="dash-topbar"><div class="dash-brand">Leaderboard</div><LoginDisplay /></header>
+    @if (_loading)
+    {
+        <LoadingPanel Message="Loading leaderboard..." />
+    }
+    else if (_error is not null)
+    {
+        <ErrorPanel Message="@_error" />
+    }
+    else
+    {
+        <div class="leaderboard-list full-width">
+            @foreach (var entry in _entries)
+            {
+                <div class="leaderboard-row">
+                    <div class="rank">#@entry.Rank</div>
+                    <div class="leader-name"><strong>@entry.DisplayName</strong><span>Level @entry.CurrentLevel · Best @entry.BestScorePercent%</span></div>
+                    <div class="leader-xp">@entry.TotalXp XP</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<LeaderboardEntryDto> _entries = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SignalR.LeaderboardUpdated += OnLeaderboardUpdated;
+        try
+        {
+            _entries = await Api.GetLeaderboardAsync();
+            await SignalR.StartAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void OnLeaderboardUpdated(IReadOnlyList<LeaderboardEntryDto> entries) =>
+        _ = InvokeAsync(() => { _entries = entries; StateHasChanged(); });
+
+    public void Dispose() => SignalR.LeaderboardUpdated -= OnLeaderboardUpdated;
+}

@@ -1,0 +1,94 @@
+@page "/"
+@attribute [Authorize]
+@inject MeridianApiClient Api
+
+<PageTitle>Meridian CPD Quiz</PageTitle>
+
+<div class="page">
+    <header class="dash-topbar">
+        <div class="dash-brand">Meridian</div>
+        <LoginDisplay />
+    </header>
+
+    <section class="dashboard-copy">
+        <span class="section-kicker">CPD Learning</span>
+        <h1>Continue your progress</h1>
+        <p>Complete quizzes, build XP and keep your professional development on track.</p>
+    </section>
+
+    @if (_loading)
+    {
+        <LoadingPanel Message="Loading your dashboard..." />
+    }
+    else if (_error is not null)
+    {
+        <ErrorPanel Message="@_error" />
+    }
+    else if (_progress is not null)
+    {
+        <section class="dash-hero-row">
+            <div class="mini-stat">
+                <span>Level</span>
+                <strong>@_progress.CurrentLevel</strong>
+            </div>
+            <div class="mini-stat">
+                <span>Total XP</span>
+                <strong>@_progress.TotalXp</strong>
+            </div>
+            <div class="mini-stat">
+                <span>Passed</span>
+                <strong>@_progress.QuizzesPassed</strong>
+            </div>
+        </section>
+    }
+
+    <section class="dashboard-section">
+        <div class="section-heading">
+            <h2>Available quizzes</h2>
+            <a href="quizzes">View all</a>
+        </div>
+
+        @if (_quizzes.Count > 0)
+        {
+            <div class="quiz-list">
+                @foreach (var quiz in _quizzes.Take(3))
+                {
+                    <article class="quiz-card">
+                        <div class="quiz-info">
+                            <div>
+                                <span class="quiz-tag">@quiz.Category</span>
+                            </div>
+                            <div class="quiz-title">@quiz.Title</div>
+                            <div class="quiz-meta">@quiz.QuestionsPerAttempt questions · @quiz.PassMarkPercent% pass · @quiz.CpdPoints CPD</div>
+                        </div>
+                        <a class="quiz-start" href="@($"quizzes/{quiz.Id}")">Start</a>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private UserProgressDto? _progress;
+    private IReadOnlyList<QuizSummaryDto> _quizzes = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _progress = await Api.GetMyProgressAsync();
+            _quizzes = await Api.GetQuizzesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
