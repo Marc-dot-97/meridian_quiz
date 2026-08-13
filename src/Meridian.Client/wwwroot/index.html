@@ -4,18 +4,70 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+
     <title>Meridian CPD</title>
+
     <link rel="icon" href="data:," />
+
     <link rel="stylesheet" href="css/theme.css" />
     <link rel="stylesheet" href="css/components.css" />
     <link rel="stylesheet" href="css/login.css" />
     <link rel="stylesheet" href="css/dashboard.css" />
     <link rel="stylesheet" href="css/app.css" />
+
+    <style>
+        .boot-screen {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 22px;
+            background: #082024;
+        }
+
+        .boot-logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #F89939;
+            color: #082024;
+            font-size: 15px;
+            font-weight: 700;
+            box-shadow: 0 0 24px rgba(248, 153, 57, 0.18);
+        }
+
+        .boot-text {
+            color: #FBFBF9;
+            font-size: 15px;
+            font-weight: 500;
+        }
+    </style>
 </head>
+
 <body>
-    <div id="app"><div class="boot-screen"><strong>Meridian</strong><span>Loading...</span></div></div>
-    <div id="blazor-error-ui">An unexpected error occurred. <a href="." class="reload">Reload</a></div>
+
+    <div id="app">
+        <div class="boot-screen">
+            <div class="boot-logo">M</div>
+
+            <span class="boot-text">
+                Loading Meridian...
+            </span>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unexpected error occurred.
+        <a href="." class="reload">Reload</a>
+    </div>
+
     <script src="_framework/blazor.webassembly.js"></script>
+
     <script src="_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"></script>
+
 </body>
 </html>
