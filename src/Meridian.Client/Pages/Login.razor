@@ -1,116 +1,81 @@
 @page "/login"
+@attribute [AllowAnonymous]
 @layout AuthLayout
-@using System.ComponentModel.DataAnnotations
 @inject IConfiguration Configuration
+@inject LocalAccountService Accounts
 @inject NavigationManager Navigation
-@inject LocalAccountService LocalAccounts
 
-<PageTitle>Sign in | Meridian</PageTitle>
+<PageTitle>Meridian | Sign in</PageTitle>
 
 <div class="login-screen">
-    <svg class="login-ambient-arc" viewBox="0 0 700 300" aria-hidden="true">
-        <ellipse cx="350" cy="70" rx="300" ry="190" fill="none" stroke="currentColor" stroke-width="2" />
-        <ellipse cx="350" cy="70" rx="245" ry="145" fill="none" stroke="currentColor" stroke-width="1" />
+    <svg class="login-ambient-arc" viewBox="0 0 200 110" aria-hidden="true">
+        <path d="M10,100 A90,90 0 0 1 190,100" fill="none" stroke="var(--muted-orange)" stroke-width="1" />
     </svg>
 
-    <section class="login-content auth-card">
-        <p class="auth-eyebrow">OPTIMUM FINANCIAL SERVICES GROUP</p>
+    <div class="login-content auth-panel">
         <h1 class="login-wordmark">Meridian</h1>
-        <p class="login-tagline">Professional development, progress and CPD learning in one place.</p>
+        <p class="login-tagline">Where possibility runs deep, one module at a time. Complete your CPD at your own pace.</p>
 
         @if (UseLocalMode)
         {
-            <EditForm Model="Model" OnValidSubmit="HandleLocalLogin" class="auth-form">
+            <EditForm Model="Model" OnValidSubmit="SignInAsync" class="auth-form">
                 <DataAnnotationsValidator />
+                <label>Work email</label>
+                <InputText class="auth-input" @bind-Value="Model.Email" autocomplete="username" />
+                <ValidationMessage For="() => Model.Email" />
 
-                @if (!string.IsNullOrWhiteSpace(_error))
+                <label>Password</label>
+                <InputText class="auth-input" @bind-Value="Model.Password" type="password" autocomplete="current-password" />
+                <ValidationMessage For="() => Model.Password" />
+
+                @if (!string.IsNullOrWhiteSpace(Error))
                 {
-                    <div class="auth-error" role="alert">@_error</div>
+                    <div class="auth-error">@Error</div>
                 }
 
-                <div class="auth-field">
-                    <label for="login-email">Email address</label>
-                    <InputText id="login-email" class="auth-input" @bind-Value="Model.Email" autocomplete="email" />
-                    <ValidationMessage For="@(() => Model.Email)" />
-                </div>
-
-                <div class="auth-field">
-                    <label for="login-password">Password</label>
-                    <InputText id="login-password" class="auth-input" type="password" @bind-Value="Model.Password" autocomplete="current-password" />
-                    <ValidationMessage For="@(() => Model.Password)" />
-                </div>
-
-                <button type="submit" class="auth-primary-btn" disabled="@_submitting">
-                    @(_submitting ? "Signing in..." : "Sign in")
-                </button>
+                <button class="quiz-start auth-submit" type="submit">Sign in</button>
             </EditForm>
 
-            <div class="demo-credentials">
-                <strong>Local demo account</strong>
-                <span>local@meridian.test</span>
-                <span>Password: Meridian123!</span>
-            </div>
+            
+            <p class="auth-switch">New to Meridian? <a href="register">Create an account</a></p>
         }
         else
         {
-            <button type="button" class="ms-signin-btn" @onclick="SignInWithMicrosoft">
-                <span class="ms-mark" aria-hidden="true">M</span>
+            <button class="ms-signin-btn" @onclick="MicrosoftLogin">
+                <svg class="ms-logo" viewBox="0 0 21 21" aria-hidden="true">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+                    <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+                </svg>
                 Sign in with Microsoft
             </button>
+            <p class="login-note">Uses your Optimum Microsoft account. No separate Meridian password required.</p>
         }
+    </div>
 
-        <p class="auth-switch">
-            New to Meridian?
-            <a href="register">Create an account</a>
-        </p>
-
-        <p class="login-footer">Meridian · CPD Learning Platform</p>
-    </section>
+    <p class="login-footer">OPTIMUM FINANCIAL SERVICES GROUP · MERIDIAN CPD</p>
 </div>
 
 @code {
-    private readonly LoginModel Model = new()
-    {
-        Email = "local@meridian.test"
-    };
-
     private bool UseLocalMode => Configuration.GetValue<bool>("Development:UseLocalMode");
-    private bool _submitting;
-    private string? _error;
+    private LoginModel Model { get; } = new();
+    private string? Error;
 
-    private async Task HandleLocalLogin()
+    private Task SignInAsync()
     {
-        _submitting = true;
-        _error = null;
-
-        try
-        {
-            var result = await LocalAccounts.LoginAsync(Model.Email, Model.Password);
-
-            if (!result.Success)
-            {
-                _error = result.ErrorMessage;
-                return;
-            }
-
+        if (Accounts.TryLogin(Model.Email, Model.Password, out var error))
             Navigation.NavigateTo("/");
-        }
-        finally
-        {
-            _submitting = false;
-        }
+        else
+            Error = error;
+        return Task.CompletedTask;
     }
 
-    private void SignInWithMicrosoft()
-        => Navigation.NavigateToLogin("authentication/login");
+    private void MicrosoftLogin() => Navigation.NavigateToLogin("authentication/login");
 
     private sealed class LoginModel
     {
-        [Required]
-        [EmailAddress]
-        public string Email { get; set; } = string.Empty;
-
-        [Required]
-        public string Password { get; set; } = string.Empty;
+        [Required, EmailAddress] public string Email { get; set; } = "local@meridian.test";
+        [Required] public string Password { get; set; } = "admin123";
     }
 }

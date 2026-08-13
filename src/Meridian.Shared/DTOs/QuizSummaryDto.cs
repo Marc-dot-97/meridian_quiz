@@ -6,4 +6,8 @@ public sealed record QuizSummaryDto(
     string Category,
     int PassMarkPercent,
     int QuestionsPerAttempt,
-    decimal CpdPoints);
+    decimal CpdPoints)
+{
+    // Null means no scheduled lock date has been supplied by the API.
+    public DateTime? AvailableFrom { get; init; }
+}

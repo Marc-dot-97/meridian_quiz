@@ -12,7 +12,7 @@
 
 .login-ambient-arc {
     position: absolute;
-    top: -10%;
+    top: 6%;
     left: 50%;
     transform: translateX(-50%);
     width: 700px;
@@ -31,7 +31,7 @@
 .login-wordmark {
     font-family: var(--font-display);
     font-size: 2.4rem;
-    letter-spacing: 0.02rem;
+    letter-spacing: 0.02em;
     margin: 0 0 8px;
 }
 
@@ -66,6 +66,12 @@
     transform: scale(0.98);
 }
 
+.ms-logo {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
 .login-footer {
     margin-top: 48px;
     font-size: 0.7rem;
@@ -80,180 +86,4 @@
     color: var(--earth-grey);
     opacity: 0.6;
     max-width: 280px;
-}
-/* Local-development login and registration forms built on Marc's Meridian theme. */
-.auth-layout {
-    min-height: 100vh;
-}
-
-.auth-card {
-    width: min(100%, 380px);
-}
-
-.auth-card-wide {
-    width: min(100%, 620px);
-    max-width: 620px;
-}
-
-.auth-eyebrow {
-    margin: 0 0 10px;
-    color: var(--muted-orange);
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-}
-
-.auth-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    text-align: left;
-}
-
-.auth-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.auth-field {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-}
-
-.auth-field label {
-    color: var(--earth-grey);
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.auth-input {
-    width: 100%;
-    box-sizing: border-box;
-    border: 1px solid rgba(255, 255, 255, 0.13);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.055);
-    color: var(--white);
-    padding: 12px 13px;
-    outline: none;
-    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.auth-input:focus {
-    border-color: var(--muted-orange);
-    background: rgba(255, 255, 255, 0.075);
-    box-shadow: 0 0 0 3px rgba(248, 153, 57, 0.12);
-}
-
-.auth-input::placeholder {
-    color: rgba(215, 221, 224, 0.45);
-}
-
-.auth-primary-btn {
-    width: 100%;
-    border: 0;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--orange), var(--muted-orange));
-    color: var(--dark-night);
-    padding: 12px 16px;
-    font-weight: 800;
-    transition: transform 0.15s ease, box-shadow 0.2s ease;
-}
-
-.auth-primary-btn:hover {
-    box-shadow: 0 8px 22px rgba(228, 100, 52, 0.22);
-}
-
-.auth-primary-btn:active {
-    transform: scale(0.99);
-}
-
-.auth-primary-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
-}
-
-.auth-error {
-    border: 1px solid rgba(228, 100, 52, 0.45);
-    border-radius: 8px;
-    background: rgba(228, 100, 52, 0.12);
-    color: #FFD4C5;
-    padding: 10px 12px;
-    font-size: 0.75rem;
-    line-height: 1.4;
-}
-
-.auth-switch {
-    margin: 22px 0 0;
-    color: var(--earth-grey);
-    font-size: 0.78rem;
-}
-
-.auth-switch a {
-    color: var(--muted-orange);
-    font-weight: 700;
-}
-
-.auth-checkbox {
-    display: flex;
-    gap: 9px;
-    align-items: flex-start;
-    color: var(--earth-grey);
-    font-size: 0.72rem;
-    line-height: 1.4;
-}
-
-.auth-checkbox input {
-    margin-top: 2px;
-}
-
-.validation-message {
-    color: #F5B09A;
-    font-size: 0.68rem;
-}
-
-.demo-credentials {
-    display: grid;
-    gap: 3px;
-    margin-top: 18px;
-    padding: 11px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.025);
-    color: var(--earth-grey);
-    font-size: 0.68rem;
-    text-align: left;
-}
-
-.demo-credentials strong {
-    color: var(--white);
-    font-size: 0.7rem;
-}
-
-.ms-mark {
-    width: 20px;
-    height: 20px;
-    display: grid;
-    place-items: center;
-    border-radius: 3px;
-    background: #f25022;
-    color: white;
-    font-size: 0.7rem;
-    font-weight: 800;
-}
-
-.register-screen {
-    padding-top: 56px;
-    padding-bottom: 56px;
-}
-
-@media (max-width: 620px) {
-    .auth-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .auth-card-wide {
-        width: min(100%, 380px);
-    }
 }

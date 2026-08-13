@@ -2,23 +2,17 @@
 @attribute [Authorize]
 @inject MeridianApiClient Api
 
-<PageTitle>Meridian CPD Quiz</PageTitle>
+<PageTitle>Meridian | Dashboard</PageTitle>
 
-<div class="page">
-    <header class="dash-topbar">
+<div class="dash-page">
+    <div class="dash-topbar">
         <div class="dash-brand">Meridian</div>
         <LoginDisplay />
-    </header>
-
-    <section class="dashboard-copy">
-        <span class="section-kicker">CPD Learning</span>
-        <h1>Continue your progress</h1>
-        <p>Complete quizzes, build XP and keep your professional development on track.</p>
-    </section>
+    </div>
 
     @if (_loading)
     {
-        <LoadingPanel Message="Loading your dashboard..." />
+        <LoadingPanel Message="Loading dashboard..." />
     }
     else if (_error is not null)
     {
@@ -26,54 +20,134 @@
     }
     else if (_progress is not null)
     {
-        <section class="dash-hero-row">
-            <div class="mini-stat">
-                <span>Level</span>
-                <strong>@_progress.CurrentLevel</strong>
+        <div class="dash-grid">
+            <div class="dash-progress-col">
+                <section class="block">
+                    <h2>Your progress</h2>
+                    <div class="arc-card">
+                        <svg class="arc-svg" viewBox="0 0 200 110" aria-label="Progress arc">
+                            <path class="arc-track" d="M20,100 A80,80 0 0 1 180,100"></path>
+                            <path class="arc-fill" d="M20,100 A80,80 0 0 1 180,100"
+                                  style="stroke-dasharray:251.33;stroke-dashoffset:@ArcOffset"></path>
+                            <circle class="arc-sun" r="7" cx="@SunX" cy="@SunY"></circle>
+                        </svg>
+                        <div class="arc-labels"><span>Dawn</span><span>Meridian</span></div>
+                        <div class="arc-rank">Current rank: <span>@RankLabel</span></div>
+                        <div class="arc-stat">@CompletedCpd / @AnnualCpdTarget CPD points completed this year</div>
+                    </div>
+                    <div class="streak-pill active"><span class="streak-flame"></span><span>@_progress.CurrentStreak-day streak</span></div>
+                </section>
             </div>
-            <div class="mini-stat">
-                <span>Total XP</span>
-                <strong>@_progress.TotalXp</strong>
-            </div>
-            <div class="mini-stat">
-                <span>Passed</span>
-                <strong>@_progress.QuizzesPassed</strong>
-            </div>
-        </section>
-    }
 
-    <section class="dashboard-section">
-        <div class="section-heading">
-            <h2>Available quizzes</h2>
-            <a href="quizzes">View all</a>
-        </div>
+            <div class="dash-quizzes-col">
+                <section class="block">
+                    <a class="dashboard-section-link" href="quizzes">
+                        <h2>Upcoming quizzes</h2>
+                        <span class="view-all">View all →</span>
+                    </a>
 
-        @if (_quizzes.Count > 0)
-        {
-            <div class="quiz-list">
-                @foreach (var quiz in _quizzes.Take(3))
-                {
-                    <article class="quiz-card">
-                        <div class="quiz-info">
-                            <div>
-                                <span class="quiz-tag">@quiz.Category</span>
-                            </div>
-                            <div class="quiz-title">@quiz.Title</div>
-                            <div class="quiz-meta">@quiz.QuestionsPerAttempt questions · @quiz.PassMarkPercent% pass · @quiz.CpdPoints CPD</div>
+                    <div class="quiz-list">
+                        @foreach (var quiz in UpcomingQuizzes)
+                        {
+                            var unlocked = IsUnlocked(quiz);
+
+                            <a class="quiz-card quiz-card-link @(unlocked ? "unlocked" : "locked")" href="quizzes">
+                                <div class="quiz-info">
+                                    <span class="quiz-title">@quiz.Title</span>
+                                    <span class="quiz-meta">
+                                        <span class="quiz-tag">@quiz.Category</span>
+                                        @quiz.CpdPoints CPD pts · @quiz.QuestionsPerAttempt questions
+                                    </span>
+
+                                    @if (!unlocked && quiz.AvailableFrom is DateTime availableFrom)
+                                    {
+                                        <span class="quiz-unlock-date">Unlocks @availableFrom.ToString("dd MMM yyyy")</span>
+                                    }
+                                </div>
+
+                                <span class="quiz-start @(unlocked ? "" : "quiz-locked")">
+                                    @(unlocked ? "Unlocked" : "Locked")
+                                </span>
+                            </a>
+                        }
+                    </div>
+                </section>
+
+                <section class="block completed-quizzes-block">
+                    <h2>Completed quizzes</h2>
+
+                    @if (_completedQuizzes.Count == 0)
+                    {
+                        <div class="empty-completed">No completed quizzes yet.</div>
+                    }
+                    else
+                    {
+                        <div class="quiz-list">
+                            @foreach (var quiz in _completedQuizzes.Take(3))
+                            {
+                                <div class="quiz-card completed-quiz-card">
+                                    <div class="quiz-info">
+                                        <span class="quiz-title">@quiz.Title</span>
+                                        <span class="quiz-meta">
+                                            <span class="quiz-tag">@quiz.Category</span>
+                                            Completed @quiz.CompletedAt.ToString("dd MMM yyyy")
+                                        </span>
+                                    </div>
+
+                                    <div class="completed-result">
+                                        <strong>@quiz.ScorePercent%</strong>
+                                        <span>+@quiz.CpdPointsEarned CPD</span>
+                                    </div>
+                                </div>
+                            }
                         </div>
-                        <a class="quiz-start" href="@($"quizzes/{quiz.Id}")">Start</a>
-                    </article>
-                }
+                    }
+                </section>
             </div>
-        }
-    </section>
+
+            <div class="dash-chart-col">
+                <section class="block">
+                    <h2>Modules completed this year</h2>
+                    <div class="chart-card">
+                        <div class="bar-chart">
+                            @foreach (var month in ChartData)
+                            {
+                                <div class="bar-col"><div class="bar" style="height:@month.Height%"></div><span>@month.Label</span></div>
+                            }
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
     private UserProgressDto? _progress;
     private IReadOnlyList<QuizSummaryDto> _quizzes = [];
+    private IReadOnlyList<CompletedQuizDto> _completedQuizzes = [];
     private bool _loading = true;
     private string? _error;
+    private const decimal AnnualCpdTarget = 18m;
+
+    private decimal CompletedCpd => Math.Min(AnnualCpdTarget, _progress is null ? 0 : _progress.QuizzesPassed * 1.5m);
+    private double Progress => (double)(CompletedCpd / AnnualCpdTarget);
+    private string ArcOffset => (251.33 * (1 - Progress)).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    private string SunX => (100 + 80 * Math.Cos(Math.PI - Math.PI * Progress)).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    private string SunY => (100 - 80 * Math.Sin(Math.PI - Math.PI * Progress)).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    private string RankLabel => Progress switch { < .25 => "Dawn", < .5 => "Ascent", < .75 => "Zenith", _ => "Meridian" };
+
+    private IEnumerable<QuizSummaryDto> UpcomingQuizzes =>
+        _quizzes
+            .Where(quiz => !_completedQuizzes.Any(completed => completed.QuizId == quiz.Id))
+            .OrderBy(quiz => quiz.AvailableFrom ?? DateTime.MinValue)
+            .Take(3);
+
+    private static bool IsUnlocked(QuizSummaryDto quiz) =>
+        quiz.AvailableFrom is null || DateTime.Today >= quiz.AvailableFrom.Value.Date;
+
+    private static readonly (string Label, int Height)[] ChartData =
+        [("Mar", 33), ("Apr", 50), ("May", 17), ("Jun", 67), ("Jul", 50), ("Aug", 33)];
 
     protected override async Task OnInitializedAsync()
     {
@@ -81,6 +155,7 @@
         {
             _progress = await Api.GetMyProgressAsync();
             _quizzes = await Api.GetQuizzesAsync();
+            _completedQuizzes = await Api.GetCompletedQuizzesAsync();
         }
         catch (Exception ex)
         {

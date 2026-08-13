@@ -2,78 +2,46 @@
 @attribute [Authorize]
 @inject MeridianApiClient Api
 @inject NavigationManager Navigation
-
-<PageTitle>Take quiz | Meridian</PageTitle>
-
-<div class="page quiz-page">
-    @if (_loading)
+<PageTitle>Meridian | Quiz</PageTitle>
+<div class="dash-page narrow-page">
+    @if (_loading) { <LoadingPanel Message="Preparing your questions..." /> }
+    else if (_error is not null) { <ErrorPanel Message="@_error" /> }
+    else if (_question is not null)
     {
-        <LoadingPanel Message="Preparing your random questions..." />
-    }
-    else if (_error is not null)
-    {
-        <ErrorPanel Message="@_error" />
-    }
-    else if (_currentQuestion is not null)
-    {
-        <header class="quiz-header-row">
-            <div>
-                <span class="quiz-tag">@(_quiz?.Category ?? "Quiz")</span>
-                <h1>@(_quiz?.Title)</h1>
-            </div>
-            <div class="score-pill">@_currentScore%</div>
-        </header>
-
-        <div class="progress-labels">
-            <span>Question @_currentQuestion.DisplayOrder of @_totalQuestions</span>
-            <span>@_currentXp XP</span>
-        </div>
-        <div class="progress-track"><div class="progress-fill" style="width:@ProgressPercent%"></div></div>
-
-        <section class="question-panel">
-            <h2>@_currentQuestion.Text</h2>
-            <div class="answer-list">
-                @foreach (var option in _currentQuestion.Options)
+        <div class="quiz-progress-line"><span>Question @_question.DisplayOrder of @_total</span><span>@_score% · @_xp XP</span></div>
+        <div class="xp-track"><div class="xp-fill" style="width:@ProgressPercent%"></div></div>
+        <section class="encounter-card">
+            <div class="encounter-eyebrow">@(_quiz?.Category) encounter</div>
+            <h1 class="encounter-question">@_question.Text</h1>
+            <div class="encounter-options">
+                @foreach (var option in _question.Options)
                 {
-                    <button class="answer-option @(_selectedAnswerId == option.Id ? "selected" : "")"
-                            disabled="@_submitting"
-                            @onclick="() => _selectedAnswerId = option.Id">
-                        @option.Text
-                    </button>
+                    <button class="encounter-option @OptionClass(option.Id)" disabled="@_submitting" @onclick="() => Select(option.Id)">@option.Text</button>
                 }
             </div>
-
-            @if (_feedback is not null)
-            {
-                <div class="feedback @(_lastAnswerCorrect ? "correct" : "wrong")">@_feedback</div>
-            }
-
-            <button class="quiz-start wide"
-                    disabled="@(_selectedAnswerId is null || _submitting)"
-                    @onclick="SubmitAnswerAsync">
-                @(_submitting ? "Checking..." : "Submit answer")
-            </button>
+            @if (!string.IsNullOrWhiteSpace(_feedback)) { <div class="feedback-text">@_feedback</div> }
+            <button class="quiz-start full-action" disabled="@(_selected is null || _submitting)" @onclick="SubmitAsync">@(_submitting ? "Checking..." : "Submit answer")</button>
         </section>
     }
 </div>
-
 @code {
     [Parameter] public long QuizId { get; set; }
     private QuizDetailsDto? _quiz;
-    private QuestionDto? _currentQuestion;
+    private QuestionDto? _question;
     private Guid? _attemptId;
-    private ulong? _selectedAnswerId;
-    private int _totalQuestions;
-    private int _answeredCount;
-    private int _currentScore;
-    private int _currentXp;
+    private ulong? _selected;
+    private ulong? _lastSelected;
+    private bool? _lastCorrect;
+    private int _total;
+    private int _answered;
+    private int _score;
+    private int _xp;
     private bool _loading = true;
     private bool _submitting;
-    private bool _lastAnswerCorrect;
     private bool _started;
     private string? _feedback;
     private string? _error;
-    private int ProgressPercent => _totalQuestions == 0 ? 0 : (int)Math.Round(_answeredCount * 100m / _totalQuestions);
+    private int ProgressPercent => _total == 0 ? 0 : (int)Math.Round(_answered * 100m / _total);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -84,36 +52,44 @@
             _quiz = await Api.GetQuizAsync((ulong)QuizId);
             var attempt = await Api.StartAttemptAsync((ulong)QuizId);
             _attemptId = attempt.AttemptId;
-            _totalQuestions = attempt.TotalQuestions;
-            _currentQuestion = attempt.FirstQuestion;
+            _total = attempt.TotalQuestions;
+            _question = attempt.FirstQuestion;
         }
         catch (Exception ex) { _error = ex.Message; }
         finally { _loading = false; }
     }
 
-    private async Task SubmitAnswerAsync()
+    private void Select(ulong id) { if (!_submitting) _selected = id; }
+    private string OptionClass(ulong id)
     {
-        if (_attemptId is null || _currentQuestion is null || _selectedAnswerId is null) return;
+        if (_lastSelected != id || _lastCorrect is null) return _selected == id ? "selected" : string.Empty;
+        return _lastCorrect.Value ? "correct" : "incorrect";
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_attemptId is null || _question is null || _selected is null) return;
         _submitting = true;
         try
         {
-            var response = await Api.SubmitAnswerAsync(_attemptId.Value, _currentQuestion.Id, _selectedAnswerId.Value);
-            _lastAnswerCorrect = response.IsCorrect;
-            _answeredCount = response.AnsweredCount;
-            _currentScore = response.CurrentScorePercent;
-            _currentXp = response.CurrentXp;
-            _feedback = response.IsCorrect ? "Correct — XP awarded." : "Not quite. Your answer has been recorded.";
-            await Task.Delay(650);
-
+            var response = await Api.SubmitAnswerAsync(_attemptId.Value, _question.Id, _selected.Value);
+            _lastSelected = _selected;
+            _lastCorrect = response.IsCorrect;
+            _feedback = response.IsCorrect ? "Correct — XP awarded." : "Answer recorded. Keep going.";
+            _answered = response.AnsweredCount;
+            _score = response.CurrentScorePercent;
+            _xp = response.CurrentXp;
+            await Task.Delay(600);
             if (response.IsComplete)
             {
                 await Api.CompleteAttemptAsync(_attemptId.Value);
                 Navigation.NavigateTo($"results/{_attemptId.Value}");
                 return;
             }
-
-            _currentQuestion = response.NextQuestion ?? throw new InvalidOperationException("No next question was returned.");
-            _selectedAnswerId = null;
+            _question = response.NextQuestion;
+            _selected = null;
+            _lastSelected = null;
+            _lastCorrect = null;
             _feedback = null;
         }
         catch (Exception ex) { _error = ex.Message; }

@@ -1,39 +1,22 @@
-@inject NavigationManager Navigation
+@inject LocalAuthenticationStateProvider LocalAuth
 @inject IConfiguration Configuration
-@inject LocalAccountService LocalAccounts
+@inject NavigationManager Navigation
 
 <AuthorizeView>
-    <Authorized Context="authContext">
+    <Authorized Context="auth">
         <div class="dash-user">
-            <div class="dash-avatar">@Initial(authContext.User.Identity?.Name)</div>
-            <div class="dash-greeting">
-                Hello, <strong>@DisplayName(authContext.User.Identity?.Name)</strong>
-                @if (UseLocalMode)
-                {
-                    <button type="button" class="local-signout" @onclick="LocalSignOut">Sign out</button>
-                }
-            </div>
+            <span class="dash-greeting">Welcome back, <strong>@DisplayName(auth.User.Identity?.Name)</strong></span>
+            <div class="dash-avatar">@Initials(auth.User.Identity?.Name)</div>
         </div>
     </Authorized>
-    <NotAuthorized>
-        <a class="quiz-start" href="login">Sign in</a>
-    </NotAuthorized>
 </AuthorizeView>
 
 @code {
-    private bool UseLocalMode => Configuration.GetValue<bool>("Development:UseLocalMode");
-
-    private async Task LocalSignOut()
+    private static string DisplayName(string? name) => string.IsNullOrWhiteSpace(name) ? "Advisor" : name;
+    private static string Initials(string? name)
     {
-        await LocalAccounts.SignOutAsync();
-        Navigation.NavigateTo("/login");
+        if (string.IsNullOrWhiteSpace(name)) return "A";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(x => char.ToUpperInvariant(x[0])));
     }
-
-    private static string DisplayName(string? name)
-        => string.IsNullOrWhiteSpace(name) ? "User" : name;
-
-    private static string Initial(string? name)
-        => string.IsNullOrWhiteSpace(name)
-            ? "U"
-            : name.Trim()[0].ToString().ToUpperInvariant();
 }

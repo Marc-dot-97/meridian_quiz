@@ -1,43 +1,30 @@
 @page "/results/{AttemptId:guid}"
 @attribute [Authorize]
 @inject MeridianApiClient Api
-
-<PageTitle>Quiz result | Meridian</PageTitle>
-
-<div class="page">
-    @if (_loading)
-    {
-        <LoadingPanel Message="Loading result..." />
-    }
-    else if (_error is not null)
-    {
-        <ErrorPanel Message="@_error" />
-    }
+<PageTitle>Meridian | Result</PageTitle>
+<div class="dash-page narrow-page">
+    @if (_loading) { <LoadingPanel Message="Loading result..." /> }
+    else if (_error is not null) { <ErrorPanel Message="@_error" /> }
     else if (_result is not null)
     {
-        <section class="result-panel @(_result.Passed ? "pass" : "fail")">
-            <div class="result-mark">@(_result.Passed ? "✓" : "↻")</div>
-            <span class="section-kicker">Quiz complete</span>
+        <section class="encounter-card result-card">
+            <div class="encounter-eyebrow">Quiz complete</div>
             <h1>@(_result.Passed ? "You passed" : "Attempt complete")</h1>
             <div class="result-score">@_result.ScorePercent%</div>
-
             <div class="detail-grid">
                 <div><span>Correct</span><strong>@_result.CorrectAnswers / @_result.TotalQuestions</strong></div>
                 <div><span>XP earned</span><strong>+@_result.XpEarned</strong></div>
                 <div><span>CPD earned</span><strong>@_result.CpdPointsEarned</strong></div>
             </div>
-
-            <a class="quiz-start wide" href="quizzes">Choose another quiz</a>
+            <a class="quiz-start full-action" href="quizzes">Choose another quiz</a>
         </section>
     }
 </div>
-
 @code {
     [Parameter] public Guid AttemptId { get; set; }
     private CompleteAttemptResponse? _result;
     private bool _loading = true;
     private string? _error;
-
     protected override async Task OnParametersSetAsync()
     {
         try { _result = await Api.GetResultAsync(AttemptId); }

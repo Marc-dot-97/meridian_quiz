@@ -35,16 +35,16 @@ public sealed class LeaderboardSignalRService(
         var apiScope = configuration["Api:Scope"]
             ?? throw new InvalidOperationException("Configuration value 'Api:Scope' is missing.");
         var tokenProvider = services.GetRequiredService<IAccessTokenProvider>();
-        var hubUrl = new Uri(new Uri(apiBaseUrl, UriKind.Absolute), "hubs/quiz");
+        var hubUrl = new Uri(new Uri(apiBaseUrl), "hubs/quiz");
 
         _connection = new HubConnectionBuilder()
             .WithUrl(hubUrl, options =>
             {
                 options.AccessTokenProvider = async () =>
                 {
-                    var tokenResult = await tokenProvider.RequestAccessToken(
+                    var result = await tokenProvider.RequestAccessToken(
                         new AccessTokenRequestOptions { Scopes = [apiScope] });
-                    return tokenResult.TryGetToken(out var token) ? token.Value : null;
+                    return result.TryGetToken(out var token) ? token.Value : null;
                 };
             })
             .WithAutomaticReconnect()
@@ -53,7 +53,6 @@ public sealed class LeaderboardSignalRService(
         _connection.On<IReadOnlyList<LeaderboardEntryDto>>(
             "LeaderboardUpdated",
             entries => LeaderboardUpdated?.Invoke(entries));
-
         await _connection.StartAsync(cancellationToken);
     }
 

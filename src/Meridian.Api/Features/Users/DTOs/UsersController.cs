@@ -139,7 +139,7 @@ public sealed class UsersController : ControllerBase
             UserName = request.UserName.Trim(),
 
             // This database field is currently required.
-            // We can change this once Marc confirms its intended meaning.
+            //
             Administrators = string.Empty,
 
             Email = request.Email.Trim(),

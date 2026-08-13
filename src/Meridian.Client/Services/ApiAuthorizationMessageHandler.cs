@@ -15,9 +15,6 @@ public sealed class ApiAuthorizationMessageHandler : AuthorizationMessageHandler
             ?? throw new InvalidOperationException("Configuration value 'Api:BaseUrl' is missing.");
         var apiScope = configuration["Api:Scope"]
             ?? throw new InvalidOperationException("Configuration value 'Api:Scope' is missing.");
-
-        ConfigureHandler(
-            authorizedUrls: [apiBaseUrl.TrimEnd('/')],
-            scopes: [apiScope]);
+        ConfigureHandler([apiBaseUrl.TrimEnd('/')], [apiScope]);
     }
 }

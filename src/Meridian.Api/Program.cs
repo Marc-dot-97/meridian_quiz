@@ -6,17 +6,9 @@ using MySql.EntityFrameworkCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --------------------------------------------------
-// Controllers
-// --------------------------------------------------
-
 builder.Services.AddControllers();
 
-
-// --------------------------------------------------
-// MySQL database
-// --------------------------------------------------
-
+// MySQL
 var connectionString =
     builder.Configuration.GetConnectionString("MeridianDb")
     ?? throw new InvalidOperationException(
@@ -27,11 +19,21 @@ builder.Services.AddDbContext<MeridianDbContext>(options =>
     options.UseMySQL(connectionString);
 });
 
+// CORS for Blazor WASM client
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MeridianClient", policy =>
+    {
+        policy
+            .WithOrigins(
+                "https://localhost:7274",
+                "http://localhost:5274")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
-// --------------------------------------------------
 // Microsoft Entra authentication
-// --------------------------------------------------
-
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApi(
@@ -39,35 +41,20 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-
-// --------------------------------------------------
-// OpenAPI
-// --------------------------------------------------
-
 builder.Services.AddOpenApi();
 
-
 var app = builder.Build();
-
-
-// --------------------------------------------------
-// Development
-// --------------------------------------------------
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-
-// --------------------------------------------------
-// HTTP pipeline
-// --------------------------------------------------
-
 app.UseHttpsRedirection();
 
-app.UseAuthentication();
+app.UseCors("MeridianClient");
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

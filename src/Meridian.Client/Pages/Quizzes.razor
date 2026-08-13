@@ -2,19 +2,13 @@
 @attribute [Authorize]
 @inject MeridianApiClient Api
 
-<PageTitle>Quizzes | Meridian</PageTitle>
+<PageTitle>Meridian | Quizzes</PageTitle>
 
-<div class="page">
-    <header class="dash-topbar">
-        <div class="dash-brand">Meridian</div>
+<div class="dash-page">
+    <div class="dash-topbar">
+        <div class="dash-brand">Quizzes</div>
         <LoginDisplay />
-    </header>
-
-    <section class="dashboard-copy">
-        <span class="section-kicker">Quiz Library</span>
-        <h1>Choose a quiz</h1>
-        <p>Each attempt receives a random set of questions.</p>
-    </section>
+    </div>
 
     @if (_loading)
     {
@@ -26,19 +20,39 @@
     }
     else
     {
-        <div class="quiz-list full-width">
-            @foreach (var quiz in _quizzes)
-            {
-                <article class="quiz-card">
-                    <div class="quiz-info">
-                        <div><span class="quiz-tag">@quiz.Category</span></div>
-                        <div class="quiz-title">@quiz.Title</div>
-                        <div class="quiz-meta">@quiz.QuestionsPerAttempt questions · @quiz.PassMarkPercent% pass · @quiz.CpdPoints CPD</div>
+        <section class="block">
+            <h2>Available modules</h2>
+            <div class="quiz-list">
+                @foreach (var quiz in _quizzes)
+                {
+                    var unlocked = IsUnlocked(quiz);
+
+                    <div class="quiz-card @(unlocked ? "unlocked" : "locked")">
+                        <div class="quiz-info">
+                            <span class="quiz-title">@quiz.Title</span>
+                            <span class="quiz-meta">
+                                <span class="quiz-tag">@quiz.Category</span>
+                                @quiz.CpdPoints CPD pts · @quiz.PassMarkPercent% pass mark
+                            </span>
+
+                            @if (!unlocked && quiz.AvailableFrom is DateTime availableFrom)
+                            {
+                                <span class="quiz-unlock-date">Unlocks @availableFrom.ToString("dd MMM yyyy")</span>
+                            }
+                        </div>
+
+                        @if (unlocked)
+                        {
+                            <a class="quiz-start" href="@($"quizzes/{quiz.Id}")">View</a>
+                        }
+                        else
+                        {
+                            <span class="quiz-start quiz-locked">Locked</span>
+                        }
                     </div>
-                    <a class="quiz-start" href="@($"quizzes/{quiz.Id}")">View</a>
-                </article>
-            }
-        </div>
+                }
+            </div>
+        </section>
     }
 </div>
 
@@ -47,10 +61,22 @@
     private bool _loading = true;
     private string? _error;
 
+    private static bool IsUnlocked(QuizSummaryDto quiz) =>
+        quiz.AvailableFrom is null || DateTime.Today >= quiz.AvailableFrom.Value.Date;
+
     protected override async Task OnInitializedAsync()
     {
-        try { _quizzes = await Api.GetQuizzesAsync(); }
-        catch (Exception ex) { _error = ex.Message; }
-        finally { _loading = false; }
+        try
+        {
+            _quizzes = await Api.GetQuizzesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 }
