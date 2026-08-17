@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Meridian | Dashboard</title>
+        <link rel="stylesheet" href="css/theme.css">
+        <link rel="stylesheet" href="css/components.css">
+        <link rel="stylesheet" href="css/dashboard.css">
+    </head>
+    <body>
+        <div class="dash-page">
+            <div class="dash-topbar">
+                <div class="dash-brand">Meridian</div>
+                <div class="dash-user">
+                    <span class="dash-greeting"> Welcome back, <strong>Marc</strong></span>
+                    <div class="dash-avatar">MB</div>
+                </div>
+            </div>
+            <div class="dash-grid">
+                <div class="dash-progress-col">
+                    <section class="block">
+                        <h2>Your progress</h2>
+                        <div class="arc-card" id="dashArcCard">
+                            <svg class="arc-svg" viewBox="0 0 200 110">
+                                <path class="arc-track" d="M20,100 A80,80 0 0 1 180,100"></path>
+                                <path class="arc-fill" d="M20, 100 A80,80 0 0 1 180,100"></path>
+                                <circle class="arm-sum" r="7" cx="20" cy="100"></circle>
+                            </svg>
+                            <div class="arc-labels"><span>Dawn</span><span>Zenith</span></div>
+                            <div class="arc-fill">Current rank: <span class="rank-label">Ascent</span></div>
+                            <div class="arc-stat">9.5 / 18 CPD hours completed this year</div>
+                        </div>
+                        <div class="streak-pill active"><span class="streak-flame"></span> <span>4-day streak</span></div>
+                    </section>
+                </div>
+                <div class="dash-quizzes-col">
+                    <section class="block">
+                        <h2>Upcoming quizzes</h2>
+                        <div class="quiz-list">
+                            <div class="quiz-card">
+                                <div class="quiz-info">
+                                    <span class="quiz-title">POPIA &amp; Client Data Handeling</span>
+                                    <span class="quiz-meta"><span class="quiz-tag">Compliance</span>span> 2 CPD pts · Due 15 Aug</span>
+                                </div>
+                                <button class="quiz-start">Start</button>
+                            </div>
+                            <div class="quiz-card">
+                                <div class="quiz-info">
+                                    <span class="quiz-title">Retirement Annuity Product Update</span>
+                                    <span class="quiz-meta">
+                                        <span class="quiz-tag">Product</span> 3 CPD pts · Due 22 Aug
+                                    </span>
+                                </div>
+                                <button class="quiz-start">Start</button>
+                            </div>
+                            <div class="quiz-card">
+                                <div class="quiz-info">
+                                    <span class="quiz-title">Ethics in Financial Advice</span>
+                                    <span class="quiz-meta">
+                                        <span class="quiz-tag">Ethics</span> 2 CPD pts · Due 5 Sep
+                                    </span>
+                                </div>
+                                <button class="quiz-start">Start</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+                <div class="dash-chat-col">
+                    <section class="block">
+                        <h2>Modules completed this year</h2>
+                        <div class="chart-card">
+                            <div class="bar-chart">
+                                <div class="bar-col">
+                                    <div class="bar" style="height: 33%"></div><spam>Mar</spam>
+                                </div>
+                                <div class="bar-col">
+                                    <div class="bar" style="height: 50%;"></div><span>Apr</span>
+                                </div>
+                                <div class="bar-col">
+                                    <div class="bar" style="height: 17%"></div><span>May</span>
+                                </div>
+                                    <div class="bar-col" style="height: 67%"></div><span>Jun</span>
+                                </div>
+                                <div class="bar-col">
+                                    <div class="bar" style="height: 50%"></div><span>Jul</span>
+                                </div>
+                                <div class="bar-col">
+                                    <div class="bar" style="height: 33%"></div><span>Aug</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            const fill = document.querySelector('#dashArcCard .arc-fill');
+            const sun = document.querySelector('#dashArcCard .arc-sun');
+            const rankLabel = document.querySelector('#dashArcCard .rank-label');
+            const ranks = ['Dawn', 'Ascent', 'Zenith', 'Meridian'];
+            const len = fill.getTotalLength();
+            fill.style.strokeDasharray = len;
+            function setProgress(p) {
+                fill.style.strokeDashoffset = len * (1 - p);
+                const pt = fill.getPointATLength(len * p);
+                sun.setAttribute('cx', pt.x); sun.setAttribute('cy', pt.y);
+                const idx = Math.min(ranks.length - 1, Math.floor(p * ranks.length));
+                rankLabel.textContent = ranks[idx];
+            }
+            setProgress(0.53); // 9.5 / 18 CPD hours
+        </script>
+    </body>
+</html>
