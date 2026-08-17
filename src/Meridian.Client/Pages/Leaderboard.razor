@@ -1,0 +1,29 @@
+@page "/leaderboard"
+@attribute [Authorize]
+@inject MeridianApiClient Api
+<PageTitle>Meridian | Leaderboard</PageTitle>
+<div class="dash-page narrow-page">
+    <div class="dash-topbar"><div class="dash-brand">Leaderboard</div><LoginDisplay /></div>
+    @if (_loading) { <LoadingPanel Message="Loading leaderboard..." /> }
+    else if (_error is not null) { <ErrorPanel Message="@_error" /> }
+    else
+    {
+        <div class="leaderboard-list">
+            @foreach (var entry in _entries)
+            {
+                <div class="leaderboard-row"><span class="leader-rank">#@entry.Rank</span><div><strong>@entry.DisplayName</strong><span>Level @entry.CurrentLevel · Best @entry.BestScorePercent%</span></div><strong>@entry.TotalXp XP</strong></div>
+            }
+        </div>
+    }
+</div>
+@code {
+    private IReadOnlyList<LeaderboardEntryDto> _entries = [];
+    private bool _loading = true;
+    private string? _error;
+    protected override async Task OnInitializedAsync()
+    {
+        try { _entries = await Api.GetLeaderboardAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

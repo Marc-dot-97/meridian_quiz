@@ -1,0 +1,37 @@
+@page "/quizzes/{QuizId:long}"
+@attribute [Authorize]
+@inject MeridianApiClient Api
+<PageTitle>Meridian | Quiz details</PageTitle>
+<div class="dash-page narrow-page">
+    <div class="dash-topbar"><a class="subtle-link" href="quizzes">← Quizzes</a><LoginDisplay /></div>
+    @if (_loading) { <LoadingPanel Message="Loading quiz..." /> }
+    else if (_error is not null) { <ErrorPanel Message="@_error" /> }
+    else if (_quiz is not null)
+    {
+        <section class="encounter-card">
+            <div class="encounter-eyebrow">@_quiz.Category</div>
+            <h1 class="detail-title">@_quiz.Title</h1>
+            <p class="detail-copy">@_quiz.Description</p>
+            <div class="detail-grid">
+                <div><span>Questions</span><strong>@_quiz.QuestionsPerAttempt</strong></div>
+                <div><span>Pass mark</span><strong>@_quiz.PassMarkPercent%</strong></div>
+                <div><span>CPD points</span><strong>@_quiz.CpdPoints</strong></div>
+                <div><span>Time</span><strong>@_quiz.TimeLimitMinutes min</strong></div>
+            </div>
+            <p class="detail-copy"><strong>Instructions:</strong> @_quiz.Instructions</p>
+            <a class="quiz-start full-action" href="@($"quiz/{_quiz.Id}/take")">Start quiz</a>
+        </section>
+    }
+</div>
+@code {
+    [Parameter] public long QuizId { get; set; }
+    private QuizDetailsDto? _quiz;
+    private bool _loading = true;
+    private string? _error;
+    protected override async Task OnParametersSetAsync()
+    {
+        try { _quiz = await Api.GetQuizAsync((ulong)QuizId); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

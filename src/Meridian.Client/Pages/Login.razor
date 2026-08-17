@@ -1,0 +1,82 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@layout AuthLayout
+@inject IConfiguration Configuration
+@inject LocalAccountService Accounts
+@inject NavigationManager Navigation
+
+<PageTitle>Meridian | Sign in</PageTitle>
+
+<div class="login-screen">
+    <svg class="login-ambient-arc" viewBox="0 0 200 110" aria-hidden="true">
+        <path d="M10,100 A90,90 0 0 1 190,100" fill="none" stroke="var(--muted-orange)" stroke-width="1" />
+    </svg>
+
+    <div class="login-content auth-panel">
+        <h1 class="login-wordmark">Meridian</h1>
+        <p class="login-tagline">Professional development, progress and 
+            CPD learning </p>
+
+        @if (UseLocalMode)
+        {
+            <EditForm Model="Model" OnValidSubmit="SignInAsync" class="auth-form">
+                <DataAnnotationsValidator />
+                <label>Work email</label>
+                <InputText class="auth-input" @bind-Value="Model.Email" autocomplete="username" />
+                <ValidationMessage For="() => Model.Email" />
+
+                <label>Password</label>
+                <InputText class="auth-input" @bind-Value="Model.Password" type="password" autocomplete="current-password" />
+                <ValidationMessage For="() => Model.Password" />
+
+                @if (!string.IsNullOrWhiteSpace(Error))
+                {
+                    <div class="auth-error">@Error</div>
+                }
+
+                <button class="quiz-start auth-submit" type="submit">Sign in</button>
+            </EditForm>
+
+            
+            <p class="auth-switch">New to Meridian? <a href="register">Create an account</a></p>
+        }
+        else
+        {
+            <button class="ms-signin-btn" @onclick="MicrosoftLogin">
+                <svg class="ms-logo" viewBox="0 0 21 21" aria-hidden="true">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+                    <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+                </svg>
+                Sign in with Microsoft
+            </button>
+            <p class="login-note">Uses your Optimum Microsoft account. No separate Meridian password required.</p>
+        }
+    </div>
+
+    <p class="login-footer">OPTIMUM FINANCIAL SERVICES GROUP · MERIDIAN CPD</p>
+</div>
+
+@code {
+    private bool UseLocalMode => Configuration.GetValue<bool>("Development:UseLocalMode");
+    private LoginModel Model { get; } = new();
+    private string? Error;
+
+    private Task SignInAsync()
+    {
+        if (Accounts.TryLogin(Model.Email, Model.Password, out var error))
+            Navigation.NavigateTo("/");
+        else
+            Error = error;
+        return Task.CompletedTask;
+    }
+
+    private void MicrosoftLogin() => Navigation.NavigateToLogin("authentication/login");
+
+    private sealed class LoginModel
+    {
+        [Required, EmailAddress] public string Email { get; set; } = "local@meridian.test";
+        [Required] public string Password { get; set; } = "admin123";
+    }
+}

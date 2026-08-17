@@ -1,0 +1,7 @@
+@inject NavigationManager Navigation
+
+<LoadingPanel Message="Redirecting to sign in..." />
+
+@code {
+    protected override void OnInitialized() => Navigation.NavigateTo("/login");
+}
