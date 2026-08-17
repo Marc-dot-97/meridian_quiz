@@ -14,7 +14,11 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Meridian.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+<<<<<<< HEAD
 [assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+df5476cd68abcda41e852b0578733dccfa6f4451")]
+=======
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+50c9005ae0de15d78aad389467be587c641f8dce")]
+>>>>>>> 372d3fdec3bd9f50a607dc1bd21261295e9d7346
 [assembly: System.Reflection.AssemblyProductAttribute("Meridian.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Meridian.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
