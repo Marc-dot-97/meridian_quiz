@@ -14,6 +14,9 @@ public sealed class MeridianApiClient
         new(11, "Cybersecurity Awareness", "Technology", 80, new DateTime(2026, 7, 30), 1.5m)
     ];
     private int _totalXp = 240;
+    private int _monthlyXp = 240;
+    private int _monthlyXpYear = DateTime.Today.Year;
+    private int _monthlyXpMonth = DateTime.Today.Month;
     private int _completed = 6;
     private int _passed = 5;
     private int _streak = 4;
@@ -130,6 +133,8 @@ public sealed class MeridianApiClient
                 attemptId, score, passed, attempt.CorrectAnswers, attempt.Questions.Count,
                 xp, passed ? quiz.CpdPoints : 0m);
             _totalXp += xp;
+            EnsureMonthlyXpPeriod();
+            _monthlyXp += xp;
             _completed++;
             if (passed)
             {
@@ -189,13 +194,100 @@ public sealed class MeridianApiClient
             {
                 new(1, "Ayesha Daniels", 860, 9, 96),
                 new(2, "Marc Williams", 720, 8, 94),
-                new(3, "Local Developer", _totalXp, Math.Max(1, _totalXp / 100 + 1), 90),
+                new(3, "Admin", _totalXp, Math.Max(1, _totalXp / 100 + 1), 90),
                 new(4, "Thabo Nkosi", 210, 3, 84),
                 new(5, "Lerato Mokoena", 170, 2, 80)
             }.OrderByDescending(x => x.TotalXp).Take(take).Select((x, i) => x with { Rank = i + 1 }).ToList();
         }
         using var response = await _http.GetAsync($"api/leaderboard?take={take}", ct);
         return await ReadAsync<List<LeaderboardEntryDto>>(response, ct);
+    }
+
+    public async Task<IReadOnlyList<MonthlyLeaderboardEntryDto>> GetMonthlyLeaderboardAsync(
+        int year,
+        int month,
+        CancellationToken ct = default)
+    {
+        if (month < 1 || month > 12)
+            throw new ArgumentOutOfRangeException(nameof(month), "Month must be between 1 and 12.");
+
+        if (_local)
+        {
+            await Task.Delay(70, ct);
+            EnsureMonthlyXpPeriod();
+            return BuildMockMonthlyLeaderboard(year, month);
+        }
+
+        using var response = await _http.GetAsync(
+            $"api/leaderboard?year={year}&month={month}",
+            ct);
+
+        return await ReadAsync<List<MonthlyLeaderboardEntryDto>>(response, ct);
+    }
+
+    private IReadOnlyList<MonthlyLeaderboardEntryDto> BuildMockMonthlyLeaderboard(int year, int month)
+    {
+        if (year == 2026 && month == 8)
+        {
+            var localMonthlyXp =
+                year == _monthlyXpYear && month == _monthlyXpMonth
+                    ? _monthlyXp
+                    : 240;
+
+            return new List<MonthlyLeaderboardEntryDto>
+            {
+                new(1, 1, "Ayesha Daniels", 9, 96m, 860),
+                new(2, 2, "Marc Williams", 8, 94m, 720),
+                new(3, 3, "Local Developer", Math.Max(1, localMonthlyXp / 100 + 1), 90m, localMonthlyXp),
+                new(4, 4, "Thabo Nkosi", 3, 84m, 210),
+                new(5, 5, "Lerato Mokoena", 2, 80m, 170)
+            }
+            .OrderByDescending(x => x.MonthlyXp)
+            .Take(5)
+            .Select((x, index) => x with { Rank = index + 1 })
+            .ToList();
+        }
+
+        if (year == 2026 && month == 7)
+        {
+            return
+            [
+                new(1, 2, "Marc Williams", 8, 97m, 790),
+                new(2, 1, "Ayesha Daniels", 8, 93m, 710),
+                new(3, 4, "Thabo Nkosi", 3, 88m, 330),
+                new(4, 5, "Lerato Mokoena", 2, 85m, 260),
+                new(5, 3, "Local Developer", 2, 82m, 190)
+            ];
+        }
+
+        if (year == 2026 && month == 6)
+        {
+            return
+            [
+                new(1, 1, "Ayesha Daniels", 8, 95m, 680),
+                new(2, 4, "Thabo Nkosi", 3, 92m, 540),
+                new(3, 2, "Marc Williams", 7, 89m, 470),
+                new(4, 3, "Local Developer", 2, 84m, 220),
+                new(5, 5, "Lerato Mokoena", 2, 78m, 140)
+            ];
+        }
+
+        return [];
+    }
+
+    private void EnsureMonthlyXpPeriod()
+    {
+        var today = DateTime.Today;
+
+        if (_monthlyXpYear == today.Year &&
+            _monthlyXpMonth == today.Month)
+        {
+            return;
+        }
+
+        _monthlyXpYear = today.Year;
+        _monthlyXpMonth = today.Month;
+        _monthlyXp = 0;
     }
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response, CancellationToken ct)

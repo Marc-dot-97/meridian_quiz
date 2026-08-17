@@ -47,8 +47,7 @@
                     <InputText class="auth-input"
                                @bind-Value="Model.FirstName" />
 
-                    <ValidationMessage
-                        For="@(() => Model.FirstName)" />
+                    <ValidationMessage For="@(() => Model.FirstName)" />
                 </div>
 
                 <div>
@@ -57,36 +56,81 @@
                     <InputText class="auth-input"
                                @bind-Value="Model.LastName" />
 
-                    <ValidationMessage
-                        For="@(() => Model.LastName)" />
+                    <ValidationMessage For="@(() => Model.LastName)" />
                 </div>
 
             </div>
 
+
+            <!-- Work email -->
 
             <label>Work email</label>
 
             <InputText class="auth-input"
                        @bind-Value="Model.Email" />
 
-            <ValidationMessage
-                For="@(() => Model.Email)" />
+            <ValidationMessage For="@(() => Model.Email)" />
 
+
+            <!-- Department -->
 
             <label>Department</label>
 
-            <InputText class="auth-input"
-                       @bind-Value="Model.Department" />
+            <InputSelect class="auth-input"
+                         @bind-Value="Model.Department"
+                         @bind-Value:after="DepartmentChanged">
 
-            <ValidationMessage
-                For="@(() => Model.Department)" />
+                <option value="">
+                    Select department
+                </option>
 
+                @foreach (var department in DepartmentRoles.Keys)
+                {
+                    <option value="@department">
+                        @department
+                    </option>
+                }
+
+            </InputSelect>
+
+            <ValidationMessage For="@(() => Model.Department)" />
+
+
+            <!-- Role
+                 Only appears once a department has been selected -->
+            @if (!string.IsNullOrWhiteSpace(Model.Department))
+            {
+                <label>Role</label>
+
+                <InputSelect class="auth-input"
+                             @bind-Value="Model.UserRole">
+
+                    <option value="">
+                        Select role
+                    </option>
+
+                    @foreach (var role in AvailableRoles)
+                    {
+                        <option value="@role">
+                            @role
+                        </option>
+                    }
+
+                </InputSelect>
+
+                <ValidationMessage For="@(() => Model.UserRole)" />
+            }
+
+
+            <!-- Line manager -->
 
             <label>Line manager</label>
 
             <InputText class="auth-input"
                        @bind-Value="Model.LineManager" />
 
+
+            <!-- Passwords -->
 
             <div class="auth-two-col">
 
@@ -97,8 +141,7 @@
                                type="password"
                                @bind-Value="Model.Password" />
 
-                    <ValidationMessage
-                        For="@(() => Model.Password)" />
+                    <ValidationMessage For="@(() => Model.Password)" />
                 </div>
 
                 <div>
@@ -108,8 +151,7 @@
                                type="password"
                                @bind-Value="Model.ConfirmPassword" />
 
-                    <ValidationMessage
-                        For="@(() => Model.ConfirmPassword)" />
+                    <ValidationMessage For="@(() => Model.ConfirmPassword)" />
                 </div>
 
             </div>
@@ -176,10 +218,173 @@
     private bool IsSaving;
 
 
+    // -------------------------------------------------
+    // Department / Role selection
+    // -------------------------------------------------
+
+    private IReadOnlyList<string> AvailableRoles =>
+        DepartmentRoles.TryGetValue(
+            Model.Department,
+            out var roles)
+                ? roles
+                : [];
+
+
+    private void DepartmentChanged()
+    {
+        // Clear the old role whenever the user changes
+        // department so an invalid role cannot carry over.
+        Model.UserRole = string.Empty;
+    }
+
+
+    private static readonly Dictionary<string, string[]>
+        DepartmentRoles = new()
+        {
+            ["Optimum Direct Solutions (Pty) Ltd"] =
+            [
+                "Financial Advisor",
+                "Regional Manager",
+                "Administrator"
+            ],
+
+
+            ["Optimum Shared Services (Pty) Ltd"] =
+            [
+                "Chief Executive Officer (CEO)",
+                "Chief Financial Officer (CFO)",
+                "Chief Operating Officer (COO)",
+                "Finance Manager",
+                "Financial Accountant",
+                "Group Financial Accountant",
+                "Human Resource Assistant",
+                "Head Of Human Resource",
+                "Head Of IT",
+                "Senior IT Support",
+                "IT Support",
+                "Software Developer",
+                "Legal Assistant",
+                "Marketing Manager",
+                "Brand Manager",
+                "Personal Assistant",
+                "Office Cleaner",
+                "Receptionist",
+                "Driver"
+            ],
+
+
+            ["Optimum Employee Benefits (Pty) Ltd"] =
+            [
+                "Employee Benefits Consultant",
+                "Employee Benefits Administrator",
+                "Employee Benefits Manager"
+            ],
+
+
+            ["Optimum Insure Consulting (Pty) Ltd"] =
+            [
+                "Account Executive",
+                "Financial Advisor"
+            ],
+
+
+            ["Optimum Professional Financial Planning (Pty) Ltd"] =
+            [
+                "New Business Assistant",
+                "Profile Assistant",
+                "Sevicing Assistant",
+                "Financial Advisor",
+                "Franchise",
+                "Hybrid / Private Wealth",
+                "Executive Head",
+                "Operational Manager",
+                "Healthcare Administator",
+                "Healthcare Financial Advisor"
+            ],
+
+
+            ["Real Broker Solutions"] =
+            [
+                "Claims Consultant",
+                "Claims Manager",
+                "Senior Commercial Underwriter",
+                "HCV Underwriter",
+                "Underwriting Manager",
+                "Personal Lines Underwriter",
+                "HCV Support",
+                "HCV Claims",
+                "Commercial Underwriter",
+                "Junior Underwriter"
+            ],
+
+
+            ["Optimum Investment Group (Pty) Ltd"] =
+            [
+                "Advisor Consultant Manager",
+                "Advisor Consultant",
+                "Business Development Manager",
+                "Head of Distribution",
+                "Head of Manager Research",
+                "Portfolio Specialist",
+                "Junior Advisor Consultant",
+                "Junior Analyst",
+                "Intern",
+                "Equity Analyst",
+                "Portfolio Manager",
+                "Marketing Manager",
+                "Head Of Marketing",
+                "Operations Analyst",
+                "Office Manager",
+                "Portfolio Operations Analyst",
+                "Risk Analyst"
+            ]
+        };
+
+
+    // -------------------------------------------------
+    // Registration
+    // -------------------------------------------------
+
     private async Task RegisterAsync()
     {
         Error = null;
         Success = null;
+
+
+        // ---------------------------------------------
+        // Check department
+        // ---------------------------------------------
+
+        if (string.IsNullOrWhiteSpace(Model.Department))
+        {
+            Error = "Please select a department.";
+            return;
+        }
+
+
+        // ---------------------------------------------
+        // Check role
+        // ---------------------------------------------
+
+        if (string.IsNullOrWhiteSpace(Model.UserRole))
+        {
+            Error = "Please select a role.";
+            return;
+        }
+
+
+        // ---------------------------------------------
+        // Make sure the role actually belongs
+        // to the selected department.
+        // ---------------------------------------------
+
+        if (!AvailableRoles.Contains(Model.UserRole))
+        {
+            Error =
+                "The selected role is not valid for this department.";
+
+            return;
+        }
 
 
         // ---------------------------------------------
@@ -200,11 +405,10 @@
         {
             // ---------------------------------------------
             // Build username from email
-            //
-            // 
             // ---------------------------------------------
 
-            var userName = CreateUserName(Model.Email);
+            var userName =
+                CreateUserName(Model.Email);
 
 
             // ---------------------------------------------
@@ -215,15 +419,20 @@
             {
                 UserName = userName,
 
-                Email = Model.Email.Trim(),
+                Email =
+                    Model.Email.Trim(),
 
-                FirstName = Model.FirstName.Trim(),
+                FirstName =
+                    Model.FirstName.Trim(),
 
-                LastName = Model.LastName.Trim(),
+                LastName =
+                    Model.LastName.Trim(),
 
-                Department = Model.Department.Trim(),
+                Department =
+                    Model.Department.Trim(),
 
-                UserRole = "Advisor"
+                UserRole =
+                    Model.UserRole.Trim()
             };
 
 
@@ -300,6 +509,10 @@
     }
 
 
+    // -------------------------------------------------
+    // Username helper
+    // -------------------------------------------------
+
     private static string CreateUserName(string email)
     {
         if (string.IsNullOrWhiteSpace(email))
@@ -318,7 +531,7 @@
         userName = userName.Trim();
 
 
-        // Your MySQL column is varchar(50).
+        // MySQL UserName column is varchar(50).
         if (userName.Length > 50)
         {
             userName =
@@ -329,6 +542,10 @@
         return userName;
     }
 
+
+    // -------------------------------------------------
+    // Register form model
+    // -------------------------------------------------
 
     private sealed class RegisterModel
     {
@@ -348,8 +565,15 @@
             string.Empty;
 
 
-        [Required]
+        [Required(
+            ErrorMessage = "Please select a department.")]
         public string Department { get; set; } =
+            string.Empty;
+
+
+        [Required(
+            ErrorMessage = "Please select a role.")]
+        public string UserRole { get; set; } =
             string.Empty;
 
 

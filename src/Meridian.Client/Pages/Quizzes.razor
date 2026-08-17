@@ -10,7 +10,6 @@
 
         <div class="quizzes-topbar">
             <div class="dash-brand">Quizzes</div>
-
             <LoginDisplay />
         </div>
 
@@ -24,13 +23,14 @@
         }
         else
         {
+            <!-- AVAILABLE MODULES -->
             <section class="block quizzes-block">
 
                 <h2>Available modules</h2>
 
                 <div class="quiz-list">
 
-                    @foreach (var quiz in _quizzes)
+                    @foreach (var quiz in AvailableQuizzes)
                     {
                         var unlocked = IsUnlocked(quiz);
 
@@ -84,6 +84,65 @@
                 </div>
 
             </section>
+
+
+            <!-- COMPLETED QUIZZES -->
+            <section class="block completed-quizzes-block">
+
+                <h2>Completed quizzes</h2>
+
+                @if (_completedQuizzes.Count == 0)
+                {
+                    <div class="empty-completed">
+                        No completed quizzes yet.
+                    </div>
+                }
+                else
+                {
+                    <div class="quiz-list">
+
+                        @foreach (var quiz in _completedQuizzes)
+                        {
+                            <div class="quiz-card completed-quiz-card">
+
+                                <div class="quiz-info">
+
+                                    <span class="quiz-title">
+                                        @quiz.Title
+                                    </span>
+
+                                    <span class="quiz-meta">
+
+                                        <span class="quiz-tag">
+                                            @quiz.Category
+                                        </span>
+
+                                        Completed
+                                        @quiz.CompletedAt.ToString("dd MMM yyyy")
+
+                                    </span>
+
+                                </div>
+
+                                <div class="completed-result">
+
+                                    <strong>
+                                        @quiz.ScorePercent%
+                                    </strong>
+
+                                    <span>
+                                        +@quiz.CpdPointsEarned CPD
+                                    </span>
+
+                                </div>
+
+                            </div>
+                        }
+
+                    </div>
+                }
+
+            </section>
         }
 
     </div>
@@ -94,9 +153,20 @@
 
     private IReadOnlyList<QuizSummaryDto> _quizzes = [];
 
+    private IReadOnlyList<CompletedQuizDto> _completedQuizzes = [];
+
     private bool _loading = true;
 
     private string? _error;
+
+
+    private IEnumerable<QuizSummaryDto> AvailableQuizzes =>
+        _quizzes
+            .Where(
+                quiz =>
+                    !_completedQuizzes.Any(
+                        completed =>
+                            completed.QuizId == quiz.Id));
 
 
     private static bool IsUnlocked(QuizSummaryDto quiz)
@@ -112,6 +182,9 @@
         {
             _quizzes =
                 await Api.GetQuizzesAsync();
+
+            _completedQuizzes =
+                await Api.GetCompletedQuizzesAsync();
         }
         catch (Exception ex)
         {

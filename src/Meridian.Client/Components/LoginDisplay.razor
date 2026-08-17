@@ -5,18 +5,64 @@
 <AuthorizeView>
     <Authorized Context="auth">
         <div class="dash-user">
-            <span class="dash-greeting">Welcome back, <strong>@DisplayName(auth.User.Identity?.Name)</strong></span>
-            <div class="dash-avatar">@Initials(auth.User.Identity?.Name)</div>
+
+            <span class="dash-greeting">
+                Welcome back,
+                <strong>@DisplayName(auth.User.Identity?.Name)</strong>
+            </span>
+
+            <div class="dash-avatar">
+                @Initials(auth.User.Identity?.Name)
+            </div>
+
+            <button type="button"
+                    class="signout-button"
+                    @onclick="SignOut">
+                Sign out
+            </button>
+
         </div>
     </Authorized>
 </AuthorizeView>
 
 @code {
-    private static string DisplayName(string? name) => string.IsNullOrWhiteSpace(name) ? "Advisor" : name;
+    private static string DisplayName(string? name) =>
+        string.IsNullOrWhiteSpace(name)
+            ? "Advisor"
+            : name;
+
     private static string Initials(string? name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return "A";
-        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return string.Concat(parts.Take(2).Select(x => char.ToUpperInvariant(x[0])));
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "A";
+        }
+
+        var parts = name.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries);
+
+        return string.Concat(
+            parts
+                .Take(2)
+                .Select(x => char.ToUpperInvariant(x[0])));
+    }
+
+    private void SignOut()
+    {
+        var useLocalMode =
+            Configuration.GetValue<bool>(
+                "Development:UseLocalMode");
+
+        if (useLocalMode)
+        {
+            LocalAuth.SignOut();
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        Navigation.NavigateTo(
+            "authentication/logout",
+            forceLoad: true);
     }
 }

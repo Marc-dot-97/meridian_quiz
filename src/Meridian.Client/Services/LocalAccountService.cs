@@ -13,7 +13,7 @@ public sealed class LocalAccountService(LocalAuthenticationStateProvider auth)
     private readonly Dictionary<string, (string Password, string DisplayName)> _accounts =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["local@meridian.test"] = ("admin123", "Local Developer")
+            ["local@meridian.test"] = ("admin123", "Admin")
         };
 
     public bool TryLogin(string email, string password, out string? error)
