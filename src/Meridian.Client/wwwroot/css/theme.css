@@ -1,0 +1,35 @@
+:root {
+    --prime-green: #2F5D64;
+    --deep-green: #153741;
+    --orange: #E46434;
+    --muted-orange: #F89939;
+    --dark-night: #082024;
+    --earth-grey: #D7DDE0;
+    --white: #FBFBF9;
+    --font-display: 'Brother 1816', 'Trebuchet MS', -apple-,system, sans-serif;
+    --font-body: 'Trebuchet MS', -apple-,system, BlinkMacSystemFont, sans-serif;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background-color: var(--dark-night);
+    font-family: var(--font-body);
+    color: var(--white);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+:focus-visible {
+    outline: 2px solid var(--muted-orange);
+    outline-offset: 3px;
+}

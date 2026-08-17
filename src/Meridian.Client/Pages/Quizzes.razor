@@ -1,0 +1,198 @@
+@page "/quizzes"
+@attribute [Authorize]
+@inject MeridianApiClient Api
+
+<PageTitle>Meridian | Quizzes</PageTitle>
+
+<div class="dash-page quizzes-page">
+
+    <div class="quizzes-content">
+
+        <div class="quizzes-topbar">
+            <div class="dash-brand">Quizzes</div>
+            <LoginDisplay />
+        </div>
+
+        @if (_loading)
+        {
+            <LoadingPanel Message="Loading quizzes..." />
+        }
+        else if (_error is not null)
+        {
+            <ErrorPanel Message="@_error" />
+        }
+        else
+        {
+            <!-- AVAILABLE MODULES -->
+            <section class="block quizzes-block">
+
+                <h2>Available modules</h2>
+
+                <div class="quiz-list">
+
+                    @foreach (var quiz in AvailableQuizzes)
+                    {
+                        var unlocked = IsUnlocked(quiz);
+
+                        <div class="quiz-card @(unlocked ? "unlocked" : "locked")">
+
+                            <div class="quiz-info">
+
+                                <span class="quiz-title">
+                                    @quiz.Title
+                                </span>
+
+                                <span class="quiz-meta">
+
+                                    <span class="quiz-tag">
+                                        @quiz.Category
+                                    </span>
+
+                                    @quiz.CpdPoints CPD pts
+                                    ·
+                                    @quiz.PassMarkPercent% pass mark
+
+                                </span>
+
+                                @if (!unlocked &&
+                                    quiz.AvailableFrom is DateTime availableFrom)
+                                {
+                                    <span class="quiz-unlock-date">
+                                        Unlocks @availableFrom.ToString("dd MMM yyyy")
+                                    </span>
+                                }
+
+                            </div>
+
+                            @if (unlocked)
+                            {
+                                <a class="quiz-start"
+                                   href="@($"quizzes/{quiz.Id}")">
+                                    View
+                                </a>
+                            }
+                            else
+                            {
+                                <span class="quiz-start quiz-locked">
+                                    Locked
+                                </span>
+                            }
+
+                        </div>
+                    }
+
+                </div>
+
+            </section>
+
+
+            <!-- COMPLETED QUIZZES -->
+            <section class="block completed-quizzes-block">
+
+                <h2>Completed quizzes</h2>
+
+                @if (_completedQuizzes.Count == 0)
+                {
+                    <div class="empty-completed">
+                        No completed quizzes yet.
+                    </div>
+                }
+                else
+                {
+                    <div class="quiz-list">
+
+                        @foreach (var quiz in _completedQuizzes)
+                        {
+                            <div class="quiz-card completed-quiz-card">
+
+                                <div class="quiz-info">
+
+                                    <span class="quiz-title">
+                                        @quiz.Title
+                                    </span>
+
+                                    <span class="quiz-meta">
+
+                                        <span class="quiz-tag">
+                                            @quiz.Category
+                                        </span>
+
+                                        Completed
+                                        @quiz.CompletedAt.ToString("dd MMM yyyy")
+
+                                    </span>
+
+                                </div>
+
+                                <div class="completed-result">
+
+                                    <strong>
+                                        @quiz.ScorePercent%
+                                    </strong>
+
+                                    <span>
+                                        +@quiz.CpdPointsEarned CPD
+                                    </span>
+
+                                </div>
+
+                            </div>
+                        }
+
+                    </div>
+                }
+
+            </section>
+        }
+
+    </div>
+
+</div>
+
+@code {
+
+    private IReadOnlyList<QuizSummaryDto> _quizzes = [];
+
+    private IReadOnlyList<CompletedQuizDto> _completedQuizzes = [];
+
+    private bool _loading = true;
+
+    private string? _error;
+
+
+    private IEnumerable<QuizSummaryDto> AvailableQuizzes =>
+        _quizzes
+            .Where(
+                quiz =>
+                    !_completedQuizzes.Any(
+                        completed =>
+                            completed.QuizId == quiz.Id));
+
+
+    private static bool IsUnlocked(QuizSummaryDto quiz)
+    {
+        return quiz.AvailableFrom is null ||
+               DateTime.Today >= quiz.AvailableFrom.Value.Date;
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _quizzes =
+                await Api.GetQuizzesAsync();
+
+            _completedQuizzes =
+                await Api.GetCompletedQuizzesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
