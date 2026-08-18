@@ -235,3 +235,181 @@ select.auth-input {
         select.auth-input option[value=""] {
             color: #6b7280;
         }
+
+
+
+/* =========================================
+   Leaderboard month tabs
+========================================= */
+
+.leaderboard-content {
+    width: 100%;
+    max-width: 850px;
+    margin: 0 auto;
+}
+
+.leaderboard-topbar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+
+/* Monthly rankings heading */
+
+.leaderboard-month-section {
+    margin-bottom: 28px;
+}
+
+    .leaderboard-month-section h2 {
+        margin: 0 0 14px 0;
+    }
+
+
+/* Month cards */
+
+.leaderboard-month-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.leaderboard-month-card {
+    min-width: 82px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--earth-grey);
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+    .leaderboard-month-card:hover {
+        border-color: rgba(248, 153, 57, 0.45);
+        background: rgba(248, 153, 57, 0.07);
+        transform: translateY(-1px);
+    }
+
+
+    /* Selected month */
+
+    .leaderboard-month-card.active {
+        background: var(--orange);
+        border-color: var(--orange);
+        color: var(--white);
+    }
+
+.month-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.month-year {
+    font-size: 0.65rem;
+    opacity: 0.75;
+}
+
+
+/* Selected month title */
+
+.selected-month-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 14px;
+}
+
+    .selected-month-heading h2 {
+        margin: 0;
+        color: var(--white);
+    }
+
+    .selected-month-heading span {
+        color: var(--earth-grey);
+        opacity: 0.65;
+        font-size: 0.72rem;
+    }
+
+
+/* =========================================
+   Top 5 leaderboard
+========================================= */
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.leaderboard-row {
+    min-height: 76px;
+    display: grid;
+    grid-template-columns: 55px 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 14px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.leaderboard-rank {
+    color: var(--muted-orange);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.leaderboard-user {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+    .leaderboard-user strong {
+        color: var(--white);
+        font-size: 1rem;
+    }
+
+    .leaderboard-user span {
+        color: var(--earth-grey);
+        opacity: 0.7;
+        font-size: 0.72rem;
+    }
+
+.leaderboard-xp {
+    color: var(--white);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+
+/* No results */
+
+.leaderboard-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 32px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    text-align: center;
+}
+
+    .leaderboard-empty strong {
+        color: var(--white);
+    }
+
+    .leaderboard-empty span {
+        color: var(--earth-grey);
+        opacity: 0.7;
+        font-size: 0.75rem;
+    }
