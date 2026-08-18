@@ -1,0 +1,98 @@
+@page "/quiz/{QuizId:long}/take"
+@attribute [Authorize]
+@inject MeridianApiClient Api
+@inject NavigationManager Navigation
+<PageTitle>Meridian | Quiz</PageTitle>
+<div class="dash-page narrow-page">
+    @if (_loading) { <LoadingPanel Message="Preparing your questions..." /> }
+    else if (_error is not null) { <ErrorPanel Message="@_error" /> }
+    else if (_question is not null)
+    {
+        <div class="quiz-progress-line"><span>Question @_question.DisplayOrder of @_total</span><span>@_score% · @_xp XP</span></div>
+        <div class="xp-track"><div class="xp-fill" style="width:@ProgressPercent%"></div></div>
+        <section class="encounter-card">
+            <div class="encounter-eyebrow">@(_quiz?.Category) encounter</div>
+            <h1 class="encounter-question">@_question.Text</h1>
+            <div class="encounter-options">
+                @foreach (var option in _question.Options)
+                {
+                    <button class="encounter-option @OptionClass(option.Id)" disabled="@_submitting" @onclick="() => Select(option.Id)">@option.Text</button>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_feedback)) { <div class="feedback-text">@_feedback</div> }
+            <button class="quiz-start full-action" disabled="@(_selected is null || _submitting)" @onclick="SubmitAsync">@(_submitting ? "Checking..." : "Submit answer")</button>
+        </section>
+    }
+</div>
+@code {
+    [Parameter] public long QuizId { get; set; }
+    private QuizDetailsDto? _quiz;
+    private QuestionDto? _question;
+    private Guid? _attemptId;
+    private ulong? _selected;
+    private ulong? _lastSelected;
+    private bool? _lastCorrect;
+    private int _total;
+    private int _answered;
+    private int _score;
+    private int _xp;
+    private bool _loading = true;
+    private bool _submitting;
+    private bool _started;
+    private string? _feedback;
+    private string? _error;
+    private int ProgressPercent => _total == 0 ? 0 : (int)Math.Round(_answered * 100m / _total);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_started) return;
+        _started = true;
+        try
+        {
+            _quiz = await Api.GetQuizAsync((ulong)QuizId);
+            var attempt = await Api.StartAttemptAsync((ulong)QuizId);
+            _attemptId = attempt.AttemptId;
+            _total = attempt.TotalQuestions;
+            _question = attempt.FirstQuestion;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void Select(ulong id) { if (!_submitting) _selected = id; }
+    private string OptionClass(ulong id)
+    {
+        if (_lastSelected != id || _lastCorrect is null) return _selected == id ? "selected" : string.Empty;
+        return _lastCorrect.Value ? "correct" : "incorrect";
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_attemptId is null || _question is null || _selected is null) return;
+        _submitting = true;
+        try
+        {
+            var response = await Api.SubmitAnswerAsync(_attemptId.Value, _question.Id, _selected.Value);
+            _lastSelected = _selected;
+            _lastCorrect = response.IsCorrect;
+            _feedback = response.IsCorrect ? "Correct — XP awarded." : "Answer recorded. Keep going.";
+            _answered = response.AnsweredCount;
+            _score = response.CurrentScorePercent;
+            _xp = response.CurrentXp;
+            await Task.Delay(600);
+            if (response.IsComplete)
+            {
+                await Api.CompleteAttemptAsync(_attemptId.Value);
+                Navigation.NavigateTo($"results/{_attemptId.Value}");
+                return;
+            }
+            _question = response.NextQuestion;
+            _selected = null;
+            _lastSelected = null;
+            _lastCorrect = null;
+            _feedback = null;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _submitting = false; }
+    }
+}

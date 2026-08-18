@@ -1,0 +1,252 @@
+@page "/leaderboard"
+@attribute [Authorize]
+@inject MeridianApiClient Api
+
+<PageTitle>Meridian | Leaderboard</PageTitle>
+
+<div class="dash-page leaderboard-page">
+
+    <div class="leaderboard-content">
+
+        <div class="leaderboard-topbar">
+            <div class="dash-brand">
+                Leaderboard
+            </div>
+
+            <LoginDisplay />
+        </div>
+
+
+        <!-- MONTH TABS -->
+
+        <section class="leaderboard-month-section">
+
+            <h2>Monthly rankings</h2>
+
+            <div class="leaderboard-month-tabs">
+
+                @foreach (var month in AvailableMonths)
+                {
+                    var selected =
+                        month.Year == _selectedMonth.Year &&
+                        month.Month == _selectedMonth.Month;
+
+                    <button type="button"
+                            class="leaderboard-month-card @(selected ? "active" : "")"
+                            @onclick="() => SelectMonthAsync(month)">
+
+                        <span class="month-name">
+                            @month.ToString("MMM")
+                        </span>
+
+                        <span class="month-year">
+                            @month.Year
+                        </span>
+
+                    </button>
+                }
+
+            </div>
+
+        </section>
+
+
+        <!-- SELECTED MONTH -->
+
+        <div class="selected-month-heading">
+
+            <h2>
+                @_selectedMonth.ToString("MMMM yyyy")
+            </h2>
+
+            <span>
+                Top 5 users
+            </span>
+
+        </div>
+
+
+        <!-- LEADERBOARD -->
+        @if (_loading)
+        {
+            <LoadingPanel Message="Loading leaderboard..." />
+        }
+        else if (_error is not null)
+        {
+            <ErrorPanel Message="@_error" />
+        }
+        else if (_entries.Count == 0)
+        {
+            <div class="leaderboard-empty">
+
+                <strong>
+                    No leaderboard results
+                </strong>
+
+                <span>
+                    No completed quizzes were recorded for
+                    @_selectedMonth.ToString("MMMM yyyy").
+                </span>
+
+            </div>
+        }
+        else
+        {
+            <div class="leaderboard-list">
+
+                @foreach (var entry in _entries)
+                {
+                    <div class="leaderboard-row">
+
+                        <div class="leaderboard-rank">
+                            #@entry.Rank
+                        </div>
+
+
+                        <div class="leaderboard-user">
+
+                            <strong>
+                                @entry.DisplayName
+                            </strong>
+
+                            <span>
+                                Level @entry.Level
+                                ·
+                                Best @entry.BestScorePercent.ToString("0")%
+                            </span>
+
+                        </div>
+
+
+                        <div class="leaderboard-xp">
+                            @entry.MonthlyXp XP
+                        </div>
+
+                    </div>
+                }
+
+            </div>
+        }
+
+    </div>
+
+</div>
+
+
+@code {
+
+    private IReadOnlyList<MonthlyLeaderboardEntryDto>
+        _entries = [];
+
+
+    private DateTime _selectedMonth =
+        new(
+            DateTime.Today.Year,
+            DateTime.Today.Month,
+            1);
+
+
+    private bool _loading = true;
+
+    private string? _error;
+
+
+    // -----------------------------------------
+    // Months available for the current year
+    //
+    // January -> current month
+    // -----------------------------------------
+
+    private IEnumerable<DateTime> AvailableMonths
+    {
+        get
+        {
+            var currentYear =
+                DateTime.Today.Year;
+
+            var currentMonth =
+                DateTime.Today.Month;
+
+            return Enumerable
+                .Range(1, currentMonth)
+                .Select(
+                    month =>
+                        new DateTime(
+                            currentYear,
+                            month,
+                            1));
+        }
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLeaderboardAsync();
+    }
+
+
+    // -----------------------------------------
+    // User clicked a month card
+    // -----------------------------------------
+
+    private async Task SelectMonthAsync(
+        DateTime month)
+    {
+        if (_selectedMonth.Year == month.Year &&
+            _selectedMonth.Month == month.Month)
+        {
+            return;
+        }
+
+        _selectedMonth =
+            new DateTime(
+                month.Year,
+                month.Month,
+                1);
+
+        await LoadLeaderboardAsync();
+    }
+
+
+    // -----------------------------------------
+    // Load Top 5
+    // -----------------------------------------
+
+    private async Task LoadLeaderboardAsync()
+    {
+        try
+        {
+            _loading = true;
+
+            _error = null;
+
+
+            var results =
+                await Api.GetMonthlyLeaderboardAsync(
+                    _selectedMonth.Year,
+                    _selectedMonth.Month);
+
+
+            _entries =
+                results
+                    .OrderByDescending(
+                        x => x.MonthlyXp)
+                    .Take(5)
+                    .Select(
+                        (entry, index) =>
+                            entry with
+                            {
+                                Rank = index + 1
+                            })
+                    .ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
