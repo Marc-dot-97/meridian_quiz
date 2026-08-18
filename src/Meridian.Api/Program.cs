@@ -8,7 +8,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-
 // MySQL
 var connectionString =
     builder.Configuration.GetConnectionString("MeridianDb")
