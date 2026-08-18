@@ -11,7 +11,10 @@
     <body>
         <div class="dash-page">
             <div class="dash-topbar">
-                <div class="dash-brand">Meridian</div>
+                <div class="dash-brand">Meridian
+                    <button id="exportExcelBtn" style="margin-left: 16px; background: var(--orange); color: var(--white); border: none; border-radius: 8px; padding: 8px 16px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                        Export to Excel</button>
+                </div>
                 <div class="dash-user">
                     <span class="dash-greeting"> Welcome back, <strong>Marc</strong></span>
                     <div class="dash-avatar">MB</div>
@@ -110,6 +113,25 @@
                 rankLabel.textContent = ranks[idx];
             }
             setProgress(0.53); // 9.5 / 18 CPD hours
+        </script>
+        <script>
+            document.getElementById('exportExcelBtn').addEventListener('click', async () => {
+                const btn = document.getElementById('exportExcelBtn');
+                btn.disabled = true; btn.textContent = 'Generating . . .';
+                try {
+                    const res = await fetch('http://localhost:5029/api/reports/export?managerId=3&cadence=Quaterly');
+                    if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'Meridian-CPD-Report.xlsx'; a.click();
+                    URL.revokeObjectURL(url);
+                } catch (err) {
+                    alert('Export failed: ' + err.message);
+                } finally {
+                    btn.disabled = false; btn.textContent = 'Export to Excel';
+                }
+            });
         </script>
     </body>
 </html>
