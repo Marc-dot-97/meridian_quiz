@@ -1,7 +1,7 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Meridian.Shared/Meridian.Shared.csproj" />
     <Project Path="src/Meridian.Api/Meridian.Api.csproj" />
+    <Project Path="src/Meridian.Client/Meridian.Client.csproj" />
   </Folder>
-  <Project Path="src/Meridian.Client/Meridian.Client.csproj" />
-  <Project Path="src/Meridian.Shared/Meridian.Shared.csproj" />
 </Solution>
