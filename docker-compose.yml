@@ -1,0 +1,50 @@
+services: 
+  meridian-api:
+    build:
+      context: ./src/Meridian.Api
+      dockerfile: Dockerfile
+    container_name: meridian-api
+    ports:
+      - "5100:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings_Default=Server=meridian-db;Database=MeridianDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True
+    depends_on:
+      - meridian-db
+    networks: 
+    - meridian-net
+
+  meridian-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: meridian-db
+    environment: 
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+    ports:
+      - "1433:1433"
+    volumes: 
+      - meridian-db-data:/var/opt/mssql
+    networks:
+      - meridian-net
+
+# meridian-client: Blazor WASM static host / will remove comment once Pierre has Dockerfile in
+# src/Meridian.Client
+# meridian-client:
+#   build:
+#     context: ./src/Meridian.Client
+#     dockerfile: Dockerfile
+#   container_name: meridian-client
+#   ports:
+#     - "5101:80"
+#   depends_on:
+#     - meridian-api
+#   networks:
+#     - meridian-net
+
+volumes:
+  meridian-db-data:
+
+networks: 
+  meridian-net:
+    driver: bridge

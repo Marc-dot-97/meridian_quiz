@@ -1,0 +1,5 @@
+@page "/authentication/{Action}"
+@attribute [AllowAnonymous]
+@layout AuthLayout
+<RemoteAuthenticatorView Action="@Action" />
+@code { [Parameter] public string? Action { get; set; } }

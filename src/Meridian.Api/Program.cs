@@ -1,9 +1,24 @@
+using Meridian.Api.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
+using MySql.EntityFrameworkCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+
+
+// MySQL
+var connectionString =
+    builder.Configuration.GetConnectionString("MeridianDb")
+    ?? throw new InvalidOperationException(
+        "Connection string 'MeridianDb' was not found.");
+
+builder.Services.AddDbContext<MeridianDbContext>(options =>
+{
+    options.UseMySQL(connectionString);
+});
 
 // CORS for Blazor WASM client
 builder.Services.AddCors(options =>
@@ -49,6 +64,9 @@ app.UseHttpsRedirection();
 app.UseCors("LocalDev");
 
 app.UseCors("MeridianClient");
+
+app.UseCors("MeridianClient");
+
 
 app.UseAuthentication();
 app.UseAuthorization();

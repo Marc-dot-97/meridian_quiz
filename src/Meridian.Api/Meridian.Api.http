@@ -1,6 +1,24 @@
-@Meridian.Api_HostAddress = http://localhost:5029
+@MeridianApi_HostAddress = https://localhost:7151
 
-GET {{Meridian.Api_HostAddress}}/weatherforecast/
+### Database test
+GET {{MeridianApi_HostAddress}}/api/database/ping
 Accept: application/json
 
-###
+
+### Get all users
+GET {{MeridianApi_HostAddress}}/api/users
+Accept: application/json
+
+
+### Create user
+POST {{MeridianApi_HostAddress}}/api/users
+Content-Type: application/json
+
+{
+  "userName": "ptest",
+  "email": "ptest@meridian.local",
+  "firstName": "Pierre",
+  "lastName": "Test",
+  "department": "IT",
+  "userRole": "Advisor"
+}
