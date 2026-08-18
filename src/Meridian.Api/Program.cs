@@ -66,6 +66,7 @@ app.UseCors("MeridianClient");
 
 app.UseCors("MeridianClient");
 
+
 app.UseAuthentication();
 app.UseAuthorization();
 

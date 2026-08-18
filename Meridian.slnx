@@ -4,5 +4,4 @@
     <Project Path="src/Meridian.Api/Meridian.Api.csproj" />
     <Project Path="src/Meridian.Client/Meridian.Client.csproj" />
   </Folder>
-  
 </Solution>
