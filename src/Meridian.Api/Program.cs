@@ -59,13 +59,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-<<<<<<< HEAD
+
 app.UseCors("LocalDev");
-=======
+
 
 app.UseCors("MeridianClient");
 
->>>>>>> 188a18034940de572c1672d6d7a203ad19c19406
+
 app.UseAuthentication();
 app.UseAuthorization();
 

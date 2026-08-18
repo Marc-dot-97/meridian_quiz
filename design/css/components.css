@@ -173,17 +173,8 @@
     animation: shake 0.4s ease;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-@keyframs shake {
-=======
-@keyframes shake {
->>>>>>> main
-=======
-
 @keyframes shake {
 
->>>>>>> 188a18034940de572c1672d6d7a203ad19c19406
     0% , 100% {
         transform: translateX(0);
     } 25% {
