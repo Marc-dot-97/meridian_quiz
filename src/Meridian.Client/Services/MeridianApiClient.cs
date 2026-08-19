@@ -10,8 +10,7 @@ public sealed class MeridianApiClient
     private readonly Dictionary<Guid, MockAttempt> _attempts = [];
     private readonly List<CompletedQuizDto> _completedQuizzes =
     [
-        new(10, "FAIS Regulatory Refresher", "Compliance", 90, new DateTime(2026, 8, 8), 2m),
-        new(11, "Cybersecurity Awareness", "Technology", 80, new DateTime(2026, 7, 30), 1.5m)
+        
     ];
     private int _totalXp = 240;
     private int _monthlyXp = 240;
