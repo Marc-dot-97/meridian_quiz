@@ -8,14 +8,16 @@ namespace Meridian.Api.Features.Reports;
 
 [ApiController]
 [Route("api/reports")]
-[Authorize] // comment this out ONLY for local testing, put it back before this touches main
+//[Authorize] // comment this out ONLY for local testing, put it back before this touches main
 public class ReportController : ControllerBase
 {
     private readonly string _connectionString;
     public ReportController(IConfiguration configuration)
     {
-        _connectionString = configuration.GetConnectionString("Default")
-            ?? throw new InvalidOperationException("Missing 'Defualt' connection string.");
+        _connectionString =
+        configuration.GetConnectionString("MeridianDb")
+        ?? throw new InvalidOperationException(
+            "Missing 'MeridianDb' connection string.");
     }
     // TEMPORARY: managerId is a query param until the Azure AD identity ->
     // users.id mapping middleware exists (still an open item on the RBAC
