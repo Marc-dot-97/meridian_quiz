@@ -3,7 +3,7 @@
 @inject MeridianApiClient Api
 @inject NavigationManager Navigation
 <PageTitle>Meridian | Quiz</PageTitle>
-<div class="dash-page narrow-page">
+<div class="dash-page take-quiz-page">
     @if (_loading) { <LoadingPanel Message="Preparing your questions..." /> }
     else if (_error is not null) { <ErrorPanel Message="@_error" /> }
     else if (_question is not null)

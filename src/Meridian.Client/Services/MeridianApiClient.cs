@@ -12,14 +12,14 @@ public sealed class MeridianApiClient
     [
         
     ];
-    private int _totalXp = 240;
-    private int _monthlyXp = 240;
+    private int _totalXp = 0;
+    private int _monthlyXp = 0;
     private int _monthlyXpYear = DateTime.Today.Year;
     private int _monthlyXpMonth = DateTime.Today.Month;
-    private int _completed = 6;
-    private int _passed = 5;
-    private int _streak = 4;
-    private int _longestStreak = 6;
+    private int _completed = 0;
+    private int _passed = 0;
+    private int _streak = 0;
+    private int _longestStreak = 0;
 
     public MeridianApiClient(HttpClient http, IConfiguration configuration)
     {
