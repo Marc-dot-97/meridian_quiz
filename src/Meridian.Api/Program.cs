@@ -19,7 +19,10 @@ builder.Services.AddDbContext<MeridianDbContext>(options =>
     options.UseMySQL(connectionString);
 });
 
-// CORS for Blazor WASM client
+// --------------------------------------------------
+// CORS for Meridian.Client
+// --------------------------------------------------
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("MeridianClient", policy =>
@@ -33,43 +36,53 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Microsoft Entra authentication
+
+// --------------------------------------------------
+// Microsoft Entra Authentication
+// --------------------------------------------------
+
 builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddAuthentication(
+        JwtBearerDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApi(
         builder.Configuration.GetSection("AzureAd"));
 
 builder.Services.AddAuthorization();
 
+
+// --------------------------------------------------
+// OpenAPI
+// --------------------------------------------------
+
 builder.Services.AddOpenApi();
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("LocalDev", policy =>
-        policy.WithOrigins("http://127.0.0.1:5500", "http://localhost:5500")
-              .AllowAnyHeader()
-              .AllowAnyMethod());
-});
 
 var app = builder.Build();
+
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
+
+// --------------------------------------------------
+// HTTP Pipeline
+// --------------------------------------------------
+
 app.UseHttpsRedirection();
 
-app.UseCors("LocalDev");
 
-app.UseCors("MeridianClient");
-
+// CORS must run before authentication/authorization
 app.UseCors("MeridianClient");
 
 
 app.UseAuthentication();
+
 app.UseAuthorization();
 
+
 app.MapControllers();
+
 
 app.Run();
