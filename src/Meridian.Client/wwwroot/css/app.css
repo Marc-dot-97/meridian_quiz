@@ -163,40 +163,189 @@ button, input { font: inherit; }
 }
 
 /* =========================================
-   Quizzes page alignment
+   Take Quiz - Larger UI
 ========================================= */
 
-.quizzes-content {
-    width: 100%;
-    max-width: 850px;
+/* Overall quiz width */
+.take-quiz-page {
+    width: 85%;
+    max-width: 950px;
     margin: 0 auto;
 }
 
-.quizzes-topbar {
+    /* Progress text at the top */
+    .take-quiz-page .quiz-progress-line {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    /* XP / progress bar */
+    .take-quiz-page .xp-track {
+        width: 100%;
+        height: 14px;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 24px;
+    }
+
+    /* Orange/filled section of XP bar */
+    .take-quiz-page .xp-fill {
+        height: 100%;
+        border-radius: 10px;
+    }
+
+    /* Quiz card */
+    .take-quiz-page .encounter-card {
+        width: 100%;
+        max-width: none;
+        min-height: 65vh;
+        padding: 32px 36px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* "COMPLIANCE ENCOUNTER" text */
+    .take-quiz-page .encounter-eyebrow {
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        margin-bottom: 14px;
+    }
+
+    /* Main question */
+    .take-quiz-page .encounter-question {
+        font-size: 1.6rem;
+        line-height: 1.35;
+        margin-bottom: 28px;
+    }
+
+    /* Area containing answers */
+    .take-quiz-page .encounter-options {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    /* Individual answers */
+    .take-quiz-page .encounter-option {
+        width: 100%;
+        min-height: 76px;
+        padding: 18px 22px;
+        font-size: 1.05rem;
+        font-weight: 600;
+        line-height: 1.4;
+        text-align: left;
+    }
+
+    /* Feedback after answering */
+    .take-quiz-page .feedback-text {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-top: 18px;
+    }
+
+    /* Submit Answer button */
+    .take-quiz-page .quiz-start.full-action {
+        width: 100%;
+        min-height: 64px;
+        margin-top: 24px;
+        padding: 16px 24px;
+        font-size: 1.4rem;
+        font-weight: 700;
+        line-height: 1.2;
+        border-radius: 10px;
+    
+    }
+
+/* =========================================
+   Take Quiz - Larger UI
+========================================= */
+
+/* Progress text at the top */
+.take-quiz-page .quiz-progress-line {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+/* XP / progress bar */
+.take-quiz-page .xp-track {
     width: 100%;
+    height: 14px;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+/* Orange/filled section of XP bar */
+.take-quiz-page .xp-fill {
+    height: 100%;
+    border-radius: 10px;
+}
+
+/* Quiz card */
+.take-quiz-page .encounter-card {
+    width: 100%;
+    min-height: 65vh;
+    padding: 32px 36px;
+    box-sizing: border-box;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 36px;
+    flex-direction: column;
 }
 
-.quizzes-topbar h1 {
-    margin: 0;
-    font-size: 1.25rem;
+/* "COMPLIANCE ENCOUNTER" text */
+.take-quiz-page .encounter-eyebrow {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
 }
 
-.quizzes-page .block {
+/* Main question */
+.take-quiz-page .encounter-question {
+    font-size: 1.6rem;
+    line-height: 1.35;
+    margin-bottom: 28px;
+}
+
+/* Area containing answers */
+.take-quiz-page .encounter-options {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Individual answers */
+.take-quiz-page .encounter-option {
     width: 100%;
+    min-height: 76px;
+    padding: 18px 22px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: left;
 }
 
-.quizzes-page .block > h2 {
-    margin: 0 0 16px 0;
+/* Feedback after answering */
+.take-quiz-page .feedback-text {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-top: 18px;
 }
 
-.quizzes-page .quiz-list {
+/* Submit Answer button */
+.take-quiz-page .quiz-start.full-action {
     width: 100%;
-    max-width: none;
-    margin: 0;
+    min-height: 64px;
+    margin-top: 24px;
+    padding: 16px 24px;
+    font-size: 1.4rem;
+    font-weight: 700;
+    border-radius: 10px;
 }
 
 /* Sign out button */
@@ -217,6 +366,192 @@ button, input { font: inherit; }
         background: rgba(248, 153, 57, 0.1);
         border-color: var(--muted-orange);
         color: var(--white);
+    }
+
+
+
+/* =========================================
+   Quizzes page alignment
+========================================= */
+
+.quizzes-content {
+    width: 85%;
+    max-width: 1050px;
+    margin: 0 auto;
+}
+
+.quizzes-topbar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 36px;
+}
+
+    .quizzes-topbar h1 {
+        margin: 0;
+        font-size: 1.25rem;
+    }
+
+.quizzes-page .block {
+    width: 100%;
+}
+
+    .quizzes-page .block > h2 {
+        margin: 0 0 16px 0;
+    }
+
+.quizzes-page .quiz-list {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+}
+
+
+
+/* =========================================
+   Quiz Details - Compact Centered Layout
+========================================= */
+
+/* Overall page width */
+.quiz-details-page {
+    width: 78%;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+    /* Main quiz details card */
+    .quiz-details-page .quiz-details-card {
+        width: 100%;
+        min-height: 52vh;
+        padding: 30px 34px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Main content fills available space */
+    .quiz-details-page .quiz-details-content {
+        flex: 1;
+    }
+
+    /* Category */
+    .quiz-details-page .encounter-eyebrow {
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        margin-bottom: 12px;
+    }
+
+    /* Main title */
+    .quiz-details-page .detail-title {
+        font-size: 1.75rem;
+        line-height: 1.2;
+        margin-bottom: 18px;
+    }
+
+    /* Description and instructions */
+    .quiz-details-page .detail-copy {
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    /* Four information boxes */
+    .quiz-details-page .detail-grid > div {
+        min-height: 75px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    /* Questions / Pass mark / CPD points / Time labels */
+    .quiz-details-page .detail-grid span {
+        font-size: 0.85rem;
+        margin-bottom: 5px;
+    }
+
+    /* Values */
+    .quiz-details-page .detail-grid strong {
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+
+    /* Start Quiz button */
+    .quiz-details-page .quiz-start.full-action {
+        width: 100%;
+        min-height: 58px;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-top: 24px;
+        border-radius: 10px;
+        text-decoration: none;
+    }
+
+    /* =========================================
+   Quiz Details - Text Scaling
+========================================= */
+
+    /* Category label */
+    .quiz-details-page .encounter-eyebrow {
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+    }
+
+    /* Main quiz title */
+    .quiz-details-page .detail-title {
+        font-size: 2rem;
+        line-height: 1.2;
+        margin-bottom: 20px;
+    }
+
+    /* Description and instructions */
+    .quiz-details-page .detail-copy {
+        font-size: 1.1rem;
+        line-height: 1.5;
+    }
+
+    /* Information boxes */
+    .quiz-details-page .detail-grid > div {
+        min-height: 90px;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    /* Small labels: Questions, Pass mark, CPD points, Time */
+    .quiz-details-page .detail-grid span {
+        font-size: 0.95rem;
+        margin-bottom: 6px;
+    }
+
+    /* Main values: 5, 70%, 2, 15 min */
+    .quiz-details-page .detail-grid strong {
+        font-size: 1.35rem;
+        font-weight: 700;
+    }
+
+    /* Start Quiz button */
+    .quiz-details-page .quiz-start.full-action {
+        width: 100%;
+        min-height: 70px;
+        padding: 18px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-top: 28px;
+        border-radius: 10px;
+        text-decoration: none;
     }
 
 /* =========================================
@@ -412,4 +747,95 @@ select.auth-input {
         color: var(--earth-grey);
         opacity: 0.7;
         font-size: 0.75rem;
+    }
+
+/* =========================================
+   Results Page - Compact
+========================================= */
+
+.results-page {
+    width: 78%;
+    max-width: 750px;
+    margin: 0 auto;
+    min-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+    /* Main result card */
+    .results-page .results-card {
+        width: 100%;
+        min-height: 400px;
+        padding: 30px 34px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+    }
+
+    /* "QUIZ COMPLETE" */
+    .results-page .encounter-eyebrow {
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        margin-bottom: 14px;
+    }
+
+    /* Attempt complete / You passed */
+    .results-page h1 {
+        font-size: 1.8rem;
+        margin-bottom: 16px;
+    }
+
+    /* Large score */
+    .results-page .result-score {
+        font-size: 3.3rem;
+        font-weight: 700;
+        line-height: 1;
+        margin: 8px 0 24px;
+    }
+
+    /* Result boxes */
+    .results-page .detail-grid {
+        width: 100%;
+        margin-bottom: 22px;
+    }
+
+        .results-page .detail-grid > div {
+            min-height: 75px;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Correct / XP / CPD labels */
+        .results-page .detail-grid span {
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+
+        /* 3/5, +30, 0 */
+        .results-page .detail-grid strong {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+    /* Choose another quiz button */
+    .results-page .quiz-start.full-action {
+        width: 100%;
+        min-height: 60px;
+        padding: 15px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1;
+        border-radius: 10px;
+        text-decoration: none;
+        margin-top: 16px;
     }
