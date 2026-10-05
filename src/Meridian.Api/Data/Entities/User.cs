@@ -5,6 +5,10 @@ namespace Meridian.Api.Data.Entities;
 
 public partial class User
 {
+    public string? PasswordHash { get; set; }
+    public string AuthRole { get; set; } = "QuizAuthor";
+    public string? LineManager { get; set; }
+
     public ulong Id { get; set; }
 
     public string UserName { get; set; } = null!;

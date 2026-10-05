@@ -1,0 +1,52 @@
+/* Survey screens share the Meridian palette and are scoped by .survey-ui. */
+.survey-ui { color: var(--white); color-scheme: dark; }
+.surveys-page { max-width: 1400px; margin: 0 auto; padding: 36px 24px 80px; }
+.survey-ui .survey-header { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 24px; }
+.survey-ui h1 { font-size: 34px; margin: 8px 0 12px; }
+.survey-ui h2 { font-size: 22px; margin: 8px 0 16px; }
+.survey-ui h3 { font-size: 17px; margin: 0; overflow-wrap: anywhere; }
+.survey-ui p { line-height: 1.6; }
+.survey-ui .survey-back { color: var(--earth-grey); text-decoration: none; font-size: 14px; }
+.survey-ui .survey-eyebrow { color: var(--muted-orange); letter-spacing: 1.6px; font-size: 11px; font-weight: 700; margin-top: 20px; }
+.survey-ui .survey-card { margin: 20px 0; padding: 26px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; }
+.survey-ui .survey-accent-card { border-top: 4px solid var(--orange); }
+.survey-ui .survey-section-heading, .survey-ui .survey-question-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.survey-ui .survey-section-heading>span, .survey-ui .survey-hint, .survey-ui .survey-list-description p { font-size: 13px; color: var(--earth-grey); }
+.survey-ui .survey-notice { color: var(--earth-grey); padding: 14px 18px; border: 1px solid var(--prime-green); border-radius: 8px; font-size: 13px; }
+.survey-ui .survey-status { color: #8fd9a8; }
+.survey-ui .survey-list-row { display: flex; justify-content: space-between; align-items: center; gap: 24px; border: 1px solid rgba(255,255,255,.12); padding: 20px; border-radius: 10px; margin-top: 12px; }
+.survey-ui .survey-list-description { min-width: 0; }
+.survey-ui .survey-list-description p { margin: 8px 0 0; }
+.survey-ui .survey-selected { border-color: var(--muted-orange); background: rgba(248,153,57,.06); }
+.survey-ui .survey-empty { padding: 30px 0 14px; text-align: center; }
+.survey-ui label:not(.survey-choice):not(.survey-checkbox-label) { display: block; font-size: 13px; font-weight: 700; margin: 18px 0 8px; }
+.survey-ui label span { font-weight: 400; }
+.survey-ui input:not([type=checkbox]):not([type=radio]), .survey-ui textarea, .survey-ui select { width: 100%; min-width: 0; background: var(--dark-night); color: var(--white); border: 1px solid rgba(255,255,255,.18); border-radius: 7px; padding: 12px; font: inherit; font-size: 15px; }
+.survey-ui textarea { min-height: 80px; resize: vertical; }
+.survey-ui input::placeholder, .survey-ui textarea::placeholder { color: #a9bec1; opacity: 1; }
+.survey-ui select option { background: var(--dark-night); color: var(--white); }
+.survey-ui input[type=checkbox], .survey-ui input[type=radio] { accent-color: var(--muted-orange); width: 18px; height: 18px; flex-shrink: 0; }
+.survey-ui .survey-checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; margin: 16px 0; }
+.survey-ui .survey-list-row .survey-checkbox-label { flex-shrink: 0; }
+.survey-ui .survey-option-editor { display: flex; gap: 10px; align-items: center; margin: 10px 0; }
+.survey-ui .survey-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.survey-ui .survey-primary, .survey-ui .survey-secondary { display: inline-block; padding: 13px 20px; border: 0; border-radius: 7px; background: var(--orange); color: var(--dark-night); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.survey-ui .survey-primary:hover:not(:disabled) { background: var(--muted-orange); }
+.survey-ui .survey-secondary { background: var(--prime-green); color: var(--white); }
+.survey-ui .survey-text-button { color: var(--muted-orange); border: 0; background: transparent; font: inherit; font-size: 13px; cursor: pointer; padding: 10px; }
+.survey-ui .survey-text-button:hover:not(:disabled) { background: rgba(248,153,57,.08); border-radius: 6px; }
+.survey-ui .survey-danger { color: #ffb099; }
+.survey-ui .survey-add { width: 100%; padding: 16px; border: 1px dashed #86a1a5; background: var(--deep-green); color: var(--white); border-radius: 8px; font: inherit; cursor: pointer; }
+.survey-ui .survey-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+.survey-ui .survey-errors { margin: 16px 0; padding: 16px; background: rgba(228,100,52,.12); border: 1px solid rgba(248,153,57,.55); border-radius: 8px; color: #ffd1bf; line-height: 1.6; overflow-wrap: anywhere; }
+.survey-ui .survey-errors ul { padding-left: 20px; margin: 4px 0; }
+.survey-ui .survey-response-question { border: 0; border-top: 1px solid rgba(255,255,255,.12); margin: 26px 0; padding: 18px 0 0; min-width: 0; }
+.survey-ui .survey-response-question legend { padding: 0 8px 0 0; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; max-width: 100%; }
+.survey-ui .survey-choice { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; margin: 8px 0; cursor: pointer; overflow-wrap: anywhere; }
+.survey-ui .survey-choice:has(input:checked) { border-color: var(--muted-orange); background: rgba(248,153,57,.08); }
+.survey-ui .survey-rating { display: flex; flex-wrap: wrap; gap: 10px; }
+.survey-ui .survey-success { border-color: var(--prime-green); }
+.survey-ui button:disabled { opacity: .45; cursor: not-allowed; }
+@media(max-width:600px) { .surveys-page { padding: 22px 12px 50px; } .survey-ui .survey-header, .survey-ui .survey-list-row { flex-direction: column; align-items: flex-start; gap: 12px; } .survey-ui .survey-card { padding: 20px 16px; } .survey-ui .survey-list-row { padding: 16px; } .survey-ui .survey-rating { gap: 6px; } }
+
+.survey-ui a.survey-primary, .survey-ui a.survey-secondary { text-decoration: none; }

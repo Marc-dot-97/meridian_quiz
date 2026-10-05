@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Meridian.Api.Data.Entities;
@@ -10,6 +10,10 @@ public partial class Quiz
     public uint CategoryId { get; set; }
 
     public string Title { get; set; } = null!;
+
+    public DateTime? AvailableFrom { get; set; }
+    public DateTime? ExpiresAt { get; set; }
+    public DateTime? DeleteAfter { get; set; }
 
     public string? Description { get; set; }
 

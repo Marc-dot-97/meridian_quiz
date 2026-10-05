@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Meridian.Api.Data.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -47,7 +47,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.DisplayOrder).HasColumnName("display_order");
             entity.Property(e => e.IsCorrect).HasColumnName("is_correct");
@@ -58,7 +58,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasMaxLength(6)
                 .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("updated_at");
 
             entity.HasOne(d => d.Question).WithMany(p => p.AnswerOptions)
@@ -82,7 +82,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.AttemptId).HasColumnName("attempt_id");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.Description)
                 .HasMaxLength(255)
@@ -123,7 +123,7 @@ public partial class MeridianDbContext : DbContext
                 .HasColumnName("code");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.Description)
                 .HasColumnType("text")
@@ -158,7 +158,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
             entity.Property(e => e.Difficulty)
@@ -179,7 +179,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasMaxLength(6)
                 .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("updated_at");
 
             entity.HasOne(d => d.ApprovedByUser).WithMany(p => p.QuestionApprovedByUsers)
@@ -203,6 +203,10 @@ public partial class MeridianDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
             entity.ToTable("quizzes");
+            entity.Property(x => x.DeleteAfter).HasColumnName("delete_after").HasColumnType("datetime(6)");
+            entity.HasIndex(x => x.DeleteAfter).HasDatabaseName("ix_quizzes_delete_after");
+            entity.Property(e => e.AvailableFrom).HasColumnType("datetime(6)").HasColumnName("available_from");
+            entity.Property(e => e.ExpiresAt).HasColumnType("datetime(6)").HasColumnName("expires_at");
 
             entity.HasIndex(e => e.CreatedByUserId, "fk_quizzes_created_by");
 
@@ -215,7 +219,7 @@ public partial class MeridianDbContext : DbContext
                 .HasColumnName("cpd_points");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
             entity.Property(e => e.Description)
@@ -241,7 +245,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasMaxLength(6)
                 .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("updated_at");
 
             entity.HasOne(d => d.Category).WithMany(p => p.Quizzes)
@@ -260,6 +264,11 @@ public partial class MeridianDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
             entity.ToTable("quiz_attempts");
+            entity.Property(e => e.QuestionsJson).HasColumnName("questions_json").HasColumnType("longtext");
+            entity.Property(e => e.AnswersJson).HasColumnName("answers_json").HasColumnType("longtext");
+            entity.Property(e => e.SnapshotPassMark).HasColumnName("snapshot_pass_mark");
+            entity.Property(e => e.SnapshotCpdPoints).HasColumnName("snapshot_cpd_points").HasPrecision(8, 2);
+            entity.Property(e => e.SnapshotTimeLimitMinutes).HasColumnName("snapshot_time_limit_minutes");
 
             entity.HasIndex(e => e.QuizId, "fk_quiz_attempts_quiz");
 
@@ -279,7 +288,7 @@ public partial class MeridianDbContext : DbContext
                 .HasColumnName("cpd_points_earned");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.Passed).HasColumnName("passed");
             entity.Property(e => e.PointsEarned).HasColumnName("points_earned");
@@ -289,7 +298,7 @@ public partial class MeridianDbContext : DbContext
                 .HasColumnName("score_percent");
             entity.Property(e => e.StartedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("started_at");
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("'1'")
@@ -298,7 +307,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasMaxLength(6)
                 .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("updated_at");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
@@ -324,7 +333,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.Description)
                 .HasColumnType("text")
@@ -339,7 +348,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasMaxLength(6)
                 .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("updated_at");
         });
 
@@ -355,7 +364,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.QuestionId).HasColumnName("question_id");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.IsActive)
                 .IsRequired()
@@ -380,6 +389,9 @@ public partial class MeridianDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
             entity.ToTable("users");
+            entity.Property(e => e.PasswordHash).HasColumnName("password_hash").HasMaxLength(512);
+            entity.Property(e => e.AuthRole).HasColumnName("auth_role").HasMaxLength(30);
+            entity.Property(e => e.LineManager).HasColumnName("line_manager").HasMaxLength(150);
 
             entity.HasIndex(e => new { e.UserName, e.Administrators }, "uq_users_auth").IsUnique();
 
@@ -388,7 +400,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
                 .HasMaxLength(6)
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("created_at");
             entity.Property(e => e.Department).HasMaxLength(100);
             entity.Property(e => e.DisplayName)
@@ -408,13 +420,13 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasMaxLength(6)
                 .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("updated_at");
             entity.Property(e => e.UserName)
                 .HasMaxLength(50)
                 .HasDefaultValueSql("'local'");
             entity.Property(e => e.UserRole)
-                .HasMaxLength(30)
+                .HasMaxLength(100)
                 .HasDefaultValueSql("'Advisor'")
                 .HasColumnName("user_role");
         });
@@ -435,7 +447,7 @@ public partial class MeridianDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasMaxLength(6)
                 .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("'CURRENT_TIMESTAMP(6)'")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
                 .HasColumnName("updated_at");
 
             entity.HasOne(d => d.User).WithOne(p => p.UserProgress)

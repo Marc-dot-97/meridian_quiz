@@ -1,0 +1,126 @@
+@page "/surveys"
+@attribute [Authorize(Policy = "QuizAuthor")]
+@inject SurveyService SurveysApi
+@inject IConfiguration Configuration
+
+<PageTitle>Meridian | Surveys</PageTitle>
+
+<div class="survey-ui surveys-page">
+    <header class="survey-header">
+        <div><BrandMark Page="Surveys" /><p class="survey-eyebrow">MERIDIAN · FEEDBACK</p><h1>Surveys</h1><p>Create surveys for people to open from their dashboard.</p></div>
+        @if (!EditorOpen) { <button type="button" class="survey-primary" disabled="@(Busy || Loading)" @onclick="OpenEditor">＋ Create survey</button> }
+    </header>
+    @if (Configuration.GetValue<bool>("Development:UseLocalMode"))
+    {
+        <p class="survey-notice">Local demo: surveys and responses are saved in this browser. They are not shared between computers.</p>
+    }
+    @if (!string.IsNullOrWhiteSpace(Error)) { <div class="survey-errors" role="alert">@Error <button type="button" class="survey-text-button" @onclick="LoadAsync" disabled="@Busy">Retry loading</button></div> }
+    @if (!string.IsNullOrWhiteSpace(Status)) { <p class="survey-status" role="status">@Status</p> }
+
+    <section class="survey-card">
+        <div class="survey-section-heading"><h2>Created surveys</h2><span>@Items.Count saved</span></div>
+        <p class="survey-hint">Saved surveys appear on the dashboard underneath Completed quizzes. Each person completes a survey once.</p>
+        @if (Loading) { <LoadingPanel Message="Loading surveys..." /> }
+        else if (Items.Count == 0)
+        {
+            <div class="survey-empty"><h3>No surveys yet</h3><p>Create your first survey to make it available on the dashboard.</p></div>
+        }
+        else
+        {
+            <div class="survey-list" @key="ListRevision">
+                @foreach (var survey in Items)
+                {
+                    <div class="survey-list-row" @key="survey.Id">
+                        <div class="survey-list-description"><h3>@survey.Title</h3><p>@survey.QuestionCount questions · @survey.ResponseCount responses · Created @QuizAvailability.Display(survey.CreatedAt)</p></div>
+                        <a class="survey-primary" href="@($"survey/{survey.Id}")">Open</a>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    @if (EditorOpen)
+    {
+        <EditForm Model="Draft" OnSubmit="SaveAsync">
+            <fieldset class="survey-fieldset" disabled="@Busy">
+                <section class="survey-card survey-accent-card">
+                    <p class="survey-eyebrow">NEW SURVEY</p><h2>Create a survey</h2>
+                    <label for="survey-title">Survey title</label><InputText id="survey-title" placeholder="e.g. Quiz feedback" maxlength="200" @bind-Value="Draft.Title" />
+                    <label for="survey-description">Description <span>(optional)</span></label><InputTextArea id="survey-description" placeholder="Tell people what you would like feedback on." maxlength="2000" @bind-Value="Draft.Description" />
+                </section>
+                @for (var i = 0; i < Draft.Questions.Count; i++)
+                {
+                    var question = Draft.Questions[i];
+                    var number = i + 1;
+                    <section class="survey-card" @key="question.Id">
+                        <div class="survey-question-header"><h3>Question @number</h3><button class="survey-text-button survey-danger" type="button" disabled="@(Draft.Questions.Count <= 1)" @onclick="() => Draft.Questions.Remove(question)">Delete question</button></div>
+                        <label for="@($"prompt-{question.Id}")">Question</label><InputTextArea id="@($"prompt-{question.Id}")" placeholder="What would you like to ask?" maxlength="2000" @bind-Value="question.Text" />
+                        <label for="@($"type-{question.Id}")">Answer type</label>
+                        <InputSelect id="@($"type-{question.Id}")" @bind-Value="question.Type">
+                            <option value="@SurveyQuestionType.MultipleChoice">Multiple choice</option><option value="@SurveyQuestionType.ShortText">Short text</option><option value="@SurveyQuestionType.Rating">Rating (1–5)</option>
+                        </InputSelect>
+                        @if (question.Type == SurveyQuestionType.MultipleChoice)
+                        {
+                            <p class="survey-hint">People choose one option. Surveys have no correct or incorrect answers.</p>
+                            @for (var j = 0; j < question.Options.Count; j++)
+                            {
+                                var index = j;
+                                <div class="survey-option-editor"><span aria-hidden="true">○</span><InputText aria-label="@($"Question {number}, choice {j + 1}")" placeholder="@($"Choice {j + 1}")" maxlength="500" @bind-Value="question.Options[index]" /><button type="button" class="survey-text-button" disabled="@(question.Options.Count <= 2)" @onclick="() => question.Options.RemoveAt(index)" aria-label="@($"Remove choice {j + 1}")">×</button></div>
+                            }
+                            <button type="button" class="survey-text-button" disabled="@(question.Options.Count >= 10)" @onclick="() => question.Options.Add(string.Empty)">＋ Add choice</button>
+                        }
+                        else if (question.Type == SurveyQuestionType.Rating)
+                        { <p class="survey-hint">People choose a number from 1 to 5. Explain the scale in your question, for example “1 = not useful, 5 = very useful”.</p> }
+                        else
+                        { <p class="survey-hint">People can write a response of up to 2,000 characters.</p> }
+                        <label class="survey-checkbox-label"><InputCheckbox @bind-Value="question.Required" /><span>Answer required when submitting</span></label>
+                    </section>
+                }
+                <button type="button" class="survey-add" disabled="@(Draft.Questions.Count >= 50)" @onclick="() => Draft.Questions.Add(new())">＋ Add question</button>
+                <section class="survey-card">
+                    <label class="survey-checkbox-label"><InputCheckbox @bind-Value="Draft.AddToArchive" /><span>Add to archive</span></label>
+                    <p class="survey-hint">When ticked, this survey and all its responses will be permanently deleted 24 months after creation. This is not a recoverable archive. Untick to keep it.</p>
+                </section>
+                @if (ValidationErrors.Count > 0)
+                { <div class="survey-errors" role="alert"><strong>Please check:</strong><ul>@foreach (var error in ValidationErrors) { <li>@error</li> }</ul></div> }
+                <div class="survey-actions"><button type="button" class="survey-secondary" @onclick="() => EditorOpen = false">Cancel</button><button type="submit" class="survey-primary">@(Busy ? "Saving…" : "Save survey")</button></div>
+            </fieldset>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private List<SurveyListItemDto> Items = [];
+    private CreateSurveyRequest Draft = new();
+    private List<string> ValidationErrors = [];
+    private bool Loading = true, Busy, EditorOpen;
+    private string? Error, Status;
+    private int ListRevision;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        Loading = true; Error = null;
+        try { Items = await SurveysApi.ListAsync(); }
+        catch (Exception ex) { Error = "Surveys could not be loaded. " + ex.Message; }
+        finally { Loading = false; ListRevision++; }
+    }
+    private void OpenEditor() { Draft = new(); ValidationErrors = []; EditorOpen = true; Status = null; }
+    private async Task SaveAsync(EditContext context)
+    {
+        if (Busy) return;
+        ValidationErrors = SurveyValidation.Definition(Draft);
+        if (!context.Validate() || ValidationErrors.Count > 0) return;
+        Busy = true; Error = null; Status = null;
+        try
+        {
+            await SurveysApi.CreateAsync(Draft);
+            EditorOpen = false;
+            Status = "Survey saved. It is now listed on the dashboard.";
+            // Creation has already succeeded; do not leave a resubmittable form if refreshing the list fails.
+            await LoadAsync();
+        }
+        catch (Exception ex) { ValidationErrors = ["Survey could not be saved. " + ex.Message]; }
+        finally { Busy = false; }
+    }
+}

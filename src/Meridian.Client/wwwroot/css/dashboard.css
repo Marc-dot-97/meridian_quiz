@@ -48,9 +48,21 @@
 
 .dash-grid { 
     display: grid; 
-    grid-template-columns: 1fr 1fr; 
-    grid-template-areas: "progress quizzes" "chart chart"; 
+    grid-template-columns: repeat(2, minmax(0, 1fr)); 
+    grid-template-areas: "progress chart" "quizzes surveys"; 
     gap: 28px; 
+}
+
+.dash-grid > div {
+    min-width: 0;
+}
+
+.dash-surveys-col {
+    grid-area: surveys;
+}
+
+.completed-surveys-block {
+    margin-top: 30px;
 }
 
 .dash-progress-col { 
@@ -74,7 +86,7 @@
     }
   .dash-grid { 
         grid-template-columns: 1fr; 
-        grid-template-areas: "progress" "quizzes" "chart"; 
+        grid-template-areas: "progress" "quizzes" "surveys" "chart"; 
     }
 }
 

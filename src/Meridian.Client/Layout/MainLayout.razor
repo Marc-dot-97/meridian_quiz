@@ -1,10 +1,72 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Navigation
 
 <div class="app-shell">
-    @Body
+    @* Login-page arc, carried across every signed-in page. *@
+    <svg class="app-ambient-arc" viewBox="0 0 200 110" aria-hidden="true" focusable="false">
+        <path d="M10,100 A90,90 0 0 1 190,100" fill="none" stroke="#F89939" stroke-width="0.5" />
+    </svg>
+    @* The sun: rises along the same arc to its peak (the meridian) on every page change. *@
+    <svg class="app-ambient-arc app-arc-sun" viewBox="0 0 200 110" aria-hidden="true" focusable="false">
+        <g class="arc-sun-orbit @_sunClass" @key="_pageKey">
+            <circle cx="100" cy="10" r="5" fill="#F89939" opacity="0.18" />
+            <circle cx="100" cy="10" r="2.2" fill="#F89939" />
+        </g>
+    </svg>
+    @* Re-keyed per page so each new page plays the rise-in animation. *@
+    <div class="app-content page-enter" @key="_pageKey">
+        @Body
+    </div>
     <nav class="bottom-nav" aria-label="Primary navigation">
+        @* Liquid indicator: two blobs merged by the goo filter, plus a glass highlight on top. *@
+        <span class="nav-liquid" aria-hidden="true">
+            <span class="nav-drop"></span>
+            <span class="nav-drop nav-drop--tail"></span>
+        </span>
+        <span class="nav-glass-pill" aria-hidden="true"></span>
         <NavLink href="/" Match="NavLinkMatch.All">Home</NavLink>
         <NavLink href="quizzes">Quizzes</NavLink>
+        <NavLink href="reports">Reports</NavLink>
         
     </nav>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <filter id="nav-goo" x="-20%" y="-60%" width="140%" height="220%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8" result="goo" />
+                <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+            </filter>
+        </defs>
+    </svg>
 </div>
+
+@code {
+    private string _pageKey = "";
+    private string _sunClass = "";           // "" = first load (sunrise only); else a full set-and-rise cycle
+
+    // Nav order decides which way the sun travels: moving right (Home → Quizzes → Reports)
+    // it sets on the right and rises again from the left; moving left it goes the other way.
+    private static readonly string[] NavOrder = ["", "/quizzes", "/reports"];
+
+    protected override void OnInitialized()
+    {
+        _pageKey = PathOf(Navigation.Uri);
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        var key = PathOf(e.Location);
+        if (key == _pageKey) return;          // same page (e.g. only the query changed): no transition
+        var from = Array.IndexOf(NavOrder, _pageKey);
+        var to = Array.IndexOf(NavOrder, key);
+        _sunClass = from >= 0 && to >= 0 && to < from ? "sun-cycle-back" : "sun-cycle";
+        _pageKey = key;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private static string PathOf(string uri) => new Uri(uri).AbsolutePath.TrimEnd('/').ToLowerInvariant();
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

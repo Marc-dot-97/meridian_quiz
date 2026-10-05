@@ -10,4 +10,5 @@ public sealed record QuizSummaryDto(
 {
     // Null means no scheduled lock date has been supplied by the API.
     public DateTime? AvailableFrom { get; init; }
+    public DateTime? ExpiresAt { get; init; }
 }

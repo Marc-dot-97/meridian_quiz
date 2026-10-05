@@ -1,47 +1,41 @@
+using System.Net.Http.Json;
+using Meridian.Shared.DTOs;
 namespace Meridian.Client.Services;
-
-public sealed record LocalRegistration(
-    string FirstName,
-    string LastName,
-    string Email,
-    string Department,
-    string LineManager,
-    string Password);
-
-public sealed class LocalAccountService(LocalAuthenticationStateProvider auth)
+public sealed class LocalAccountService(HttpClient http, LocalAuthenticationStateProvider auth)
 {
-    private readonly Dictionary<string, (string Password, string DisplayName)> _accounts =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["local@meridian.test"] = ("admin123", "Admin")
-        };
-
-    public bool TryLogin(string email, string password, out string? error)
+    public async Task LoginAsync(string email, string password)
     {
-        if (_accounts.TryGetValue(email.Trim(), out var account) && account.Password == password)
-        {
-            auth.SignIn(email.Trim(), account.DisplayName);
-            error = null;
-            return true;
-        }
-
-        error = "Email or password is incorrect.";
-        return false;
+        using var response = await http.PostAsJsonAsync("api/account/login", new LoginRequest { Email = email, Password = password });
+        await Accept(response);
     }
-
-    public bool TryRegister(LocalRegistration registration, out string? error)
+    public async Task RegisterAsync(RegisterAccountRequest request)
     {
-        var email = registration.Email.Trim();
-        if (_accounts.ContainsKey(email))
-        {
-            error = "An account with this email already exists.";
-            return false;
-        }
-
-        var displayName = $"{registration.FirstName} {registration.LastName}".Trim();
-        _accounts[email] = (registration.Password, displayName);
-        auth.SignIn(email, displayName);
-        error = null;
-        return true;
+        using var response = await http.PostAsJsonAsync("api/account/register", request);
+        await Accept(response);
+    }
+    // DEV BYPASS: the API answers 404 here unless the bypass is enabled on that server.
+    public async Task<bool> DevBypassAvailableAsync()
+    {
+        try { using var response = await http.GetAsync("api/dev/status"); return response.IsSuccessStatusCode; }
+        catch { return false; }
+    }
+    public async Task DevLoginAsync(string? email)
+    {
+        using var response = await http.PostAsJsonAsync("api/dev/login", new { Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim() });
+        await Accept(response);
+    }
+    // DEV SEED: returns the server's summary message.
+    public async Task<string> SeedAsync(bool reset, bool clearOnly = false)
+    {
+        var url = clearOnly ? "api/dev/seed/clear" : $"api/dev/seed?reset={(reset ? "true" : "false")}";
+        using var response = await http.PostAsync(url, null);
+        if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response, default);
+        var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        return body.TryGetProperty("message", out var m) ? m.GetString() ?? "Done." : "Done.";
+    }
+    private async Task Accept(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response, default);
+        auth.SignedIn(await response.Content.ReadFromJsonAsync<AccountDto>() ?? throw new InvalidOperationException("Empty login response."));
     }
 }

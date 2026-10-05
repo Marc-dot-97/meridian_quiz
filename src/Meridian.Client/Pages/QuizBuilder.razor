@@ -1,0 +1,182 @@
+@page "/quiz-builder"
+@attribute [Authorize(Policy = "QuizAuthor")]
+@inject MeridianApiClient Api
+@inject IConfiguration Configuration
+@inject HttpClient Http
+
+<PageTitle>Meridian | Create quiz</PageTitle>
+
+<div class="builder-page">
+    <header class="builder-header">
+        <div><BrandMark Page="Quiz studio" /><p class="builder-eyebrow">MERIDIAN · QUIZ STUDIO</p><h1>Create a quiz</h1><p>Build your questions, choose the answers, and set an unlock time.</p></div>
+        <span class="builder-count">@Model.Questions.Count question@(Model.Questions.Count == 1 ? "" : "s")</span>
+    </header>
+    @if (UseLocalMode)
+    {
+        <p class="builder-notice">Local demo: saved quizzes stay in this browser and appear in your quiz list. They are not shared with other users.</p>
+    }
+    @if (_canCreate is null)
+    {
+        <p class="builder-notice">Checking permissions…</p>
+    }
+    else if (_canCreate == false)
+    {
+        <section class="builder-card" role="status">
+            <span class="builder-eyebrow">QUIZ STUDIO</span>
+            <h2>Quizzes are created by line managers, HR and administrators</h2>
+            <p>You can still create surveys for your team.</p>
+            <div class="builder-actions"><a class="builder-primary" href="surveys">Create a survey</a><a class="builder-secondary" href="/">Back to dashboard</a></div>
+        </section>
+    }
+    else if (Saved is not null)
+    {
+        <section class="builder-card builder-success" role="status">
+            <span class="builder-eyebrow">QUIZ SAVED</span><h2>@Saved.Title</h2>
+            <p>@(Saved.AvailableFrom is DateTime date ? $"Available from {QuizAvailability.Display(date)}." : "Available immediately.")</p>
+            <p>@(Saved.ExpiresAt is DateTime end ? $"Expires {QuizAvailability.Display(end)}." : "No expiry date.")</p>
+            <div class="builder-actions"><a class="builder-primary" href="quizzes">View quizzes</a><button type="button" class="builder-secondary" @onclick="NewQuiz">Create another quiz</button></div>
+        </section>
+    }
+    else
+    {
+        <EditForm Model="Model" OnSubmit="SaveAsync">
+            <fieldset class="builder-fieldset" disabled="@Saving">
+                <section class="builder-card builder-title-card">
+                    <label for="quiz-title">Quiz title</label><InputText id="quiz-title" class="builder-title-input" placeholder="Untitled quiz" maxlength="200" @bind-Value="Model.Title" />
+                    <label for="quiz-description">Description <span>(optional)</span></label><InputTextArea id="quiz-description" placeholder="What will participants learn?" maxlength="5000" @bind-Value="Model.Description" />
+                    <div class="builder-grid">
+                        <div><label for="quiz-category">Category</label><InputText id="quiz-category" list="quiz-categories" maxlength="100" @bind-Value="Model.Category" /><datalist id="quiz-categories"><option>Compliance</option><option>Product</option><option>Ethics</option><option>General</option></datalist></div>
+                        <div><label for="quiz-pass">Pass mark (%)</label><InputNumber id="quiz-pass" min="1" max="100" @bind-Value="Model.PassMarkPercent" /></div>
+                        <div><label for="quiz-cpd">CPD points</label><InputNumber id="quiz-cpd" min="0" max="1000" step="0.01" @bind-Value="Model.CpdPoints" /></div>
+                    </div>
+                    <label for="quiz-instructions">Instructions</label><InputTextArea id="quiz-instructions" maxlength="5000" @bind-Value="Model.Instructions" />
+                </section>
+                @for (var i = 0; i < Model.Questions.Count; i++)
+                {
+                    var q = Model.Questions[i];
+                    var number = i + 1;
+                    <section class="builder-card builder-question" @key="q.EditorId">
+                        <div class="builder-question-top"><span class="builder-eyebrow">QUESTION @number</span><span class="builder-type">◉ Multiple choice</span></div>
+                        <label class="builder-sr-only" for="@($"question-{q.EditorId}")">Question @number text</label>
+                        <InputTextArea id="@($"question-{q.EditorId}")" class="builder-question-input" placeholder="Untitled question" maxlength="4000" @bind-Value="q.Text" />
+                        <p class="builder-hint">Select the circle beside the correct answer.</p>
+                        @for (var j = 0; j < q.Options.Count; j++)
+                        {
+                            var optionIndex = j;
+                            <div class="builder-option @(q.CorrectOptionIndex == j ? "builder-correct" : "")">
+                                <input type="radio" name="@($"answer-{q.EditorId}")" checked="@(q.CorrectOptionIndex == j)" @onchange="() => q.CorrectOptionIndex = optionIndex" aria-label="@($"Mark choice {j + 1} as correct for question {number}")" />
+                                <InputText placeholder="@($"Choice {j + 1}")" maxlength="1000" aria-label="@($"Question {number}, choice {j + 1}")" @bind-Value="q.Options[optionIndex]" />
+                                @if (q.CorrectOptionIndex == j) { <span class="builder-answer-tag">Correct</span> }
+                                <button type="button" class="builder-icon" disabled="@(q.Options.Count <= 2)" @onclick="() => RemoveOption(q, optionIndex)" aria-label="@($"Remove choice {j + 1}")">×</button>
+                            </div>
+                        }
+                        <button type="button" class="builder-text-button" disabled="@(q.Options.Count >= 10)" @onclick="() => q.Options.Add(string.Empty)">＋ Add choice</button>
+                        <footer class="builder-question-footer">
+                            <span>One correct answer</span><div>
+                                <button type="button" class="builder-text-button" disabled="@(number == 1)" @onclick="() => Move(q, -1)" aria-label="Move question up">↑</button>
+                                <button type="button" class="builder-text-button" disabled="@(number == Model.Questions.Count)" @onclick="() => Move(q, 1)" aria-label="Move question down">↓</button>
+                                <button type="button" class="builder-text-button" disabled="@(Model.Questions.Count >= 100)" @onclick="() => Duplicate(q)">Duplicate</button>
+                                <button type="button" class="builder-text-button builder-danger" disabled="@(Model.Questions.Count <= 1)" @onclick="() => Model.Questions.Remove(q)">Delete</button>
+                            </div>
+                        </footer>
+                    </section>
+                }
+                <button type="button" class="builder-add-question" disabled="@(Model.Questions.Count >= 100)" @onclick="() => Model.Questions.Add(new())">＋ Add question</button>
+                <section class="builder-card">
+                    <span class="builder-eyebrow">AVAILABILITY</span><h2>When can people take this quiz?</h2>
+                    <label for="quiz-availability">Unlock schedule</label>
+                    <InputSelect id="quiz-availability" @bind-Value="Schedule"><option value="now">Available immediately</option><option value="scheduled">Set a date and time</option></InputSelect>
+                    @if (Schedule == "scheduled")
+                    {
+                        <label for="quiz-unlock">Unlock date and time (South African time, UTC+02:00)</label>
+                        <input id="quiz-unlock" type="datetime-local" @bind="UnlockLocal" @bind:format="yyyy-MM-ddTHH:mm" />
+                        <p class="builder-hint">The quiz will appear as locked until this exact time.</p>
+                    }
+                    <label for="quiz-expiry-mode">Expiry</label>
+                    <InputSelect id="quiz-expiry-mode" @bind-Value="ExpiryMode"><option value="none">No expiry date</option><option value="scheduled">Set an expiry date and time</option></InputSelect>
+                    @if (ExpiryMode == "scheduled")
+                    {
+                        <label for="quiz-expiry">Expiry date and time (South African time, UTC+02:00)</label>
+                        <input id="quiz-expiry" type="datetime-local" @bind="ExpiryLocal" @bind:format="yyyy-MM-ddTHH:mm" />
+                        <p class="builder-hint">No new attempts can start after this time. Attempts already started may be completed.</p>
+                    }
+                </section>
+                <section class="builder-card">
+                    <label class="retention-choice"><InputCheckbox @bind-Value="Model.AddToArchive" /><span>Add to archive</span></label>
+                    <p class="builder-hint">When ticked, this quiz, its questions and all attempts/results will be permanently deleted 24 months after creation. This is not a recoverable archive. Untick to keep it. Any expiry date still applies separately.</p>
+                </section>
+                @if (Errors.Count > 0)
+                {
+                    <div class="builder-errors" role="alert"><strong>Please check the following:</strong><ul>@foreach (var error in Errors) { <li>@error</li> }</ul></div>
+                }
+                <div class="builder-save-bar"><span>@Model.Questions.Count questions · @Model.PassMarkPercent% to pass</span><button type="submit" class="builder-primary">@(Saving ? "Saving quiz…" : "Save quiz")</button></div>
+            </fieldset>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private CreateQuizRequest Model = new() { Questions = [new()] };
+    private List<string> Errors = [];
+    private CreatedQuizResponse? Saved;
+    private bool Saving;
+    private string Schedule = "now";
+    private string ExpiryMode = "none";
+    private DateTime? ExpiryLocal = DateTime.UtcNow.AddDays(7).AddHours(2);
+    private DateTime? UnlockLocal = DateTime.UtcNow.AddHours(3);
+    private bool UseLocalMode => Configuration.GetValue<bool>("Development:UseLocalMode");
+    private bool? _canCreate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _canCreate = (await Http.GetFromJsonAsync<ReportAccessDto>("api/reports/access"))?.CanCreateQuizzes == true; }
+        catch { _canCreate = false; }
+    }
+
+    private void RemoveOption(QuizBuilderQuestion question, int index)
+    {
+        question.Options.RemoveAt(index);
+        if (question.CorrectOptionIndex == index) question.CorrectOptionIndex = null;
+        else if (question.CorrectOptionIndex > index) question.CorrectOptionIndex--;
+    }
+    private void Move(QuizBuilderQuestion question, int direction)
+    {
+        var oldIndex = Model.Questions.IndexOf(question);
+        var newIndex = oldIndex + direction;
+        if (newIndex < 0 || newIndex >= Model.Questions.Count) return;
+        Model.Questions.RemoveAt(oldIndex);
+        Model.Questions.Insert(newIndex, question);
+    }
+    private void Duplicate(QuizBuilderQuestion question) => Model.Questions.Insert(Model.Questions.IndexOf(question) + 1,
+        new() { Text = question.Text, Options = [.. question.Options], CorrectOptionIndex = question.CorrectOptionIndex });
+
+    private async Task SaveAsync(EditContext context)
+    {
+        if (Saving) return;
+        Errors = [];
+        if (!context.Validate()) { Errors.Add("Check that the numeric fields contain valid numbers."); return; }
+        Model.AvailableFrom = Schedule == "scheduled" && UnlockLocal is DateTime date
+            ? new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Unspecified), TimeSpan.FromHours(2)).UtcDateTime
+            : null;
+        Model.ExpiresAt = ExpiryMode == "scheduled" && ExpiryLocal is DateTime end
+            ? new DateTimeOffset(DateTime.SpecifyKind(end, DateTimeKind.Unspecified), TimeSpan.FromHours(2)).UtcDateTime
+            : null;
+        Errors = QuizBuilderValidation.Validate(Model);
+        if (ExpiryMode == "scheduled" && (Model.ExpiresAt is null || Model.ExpiresAt <= DateTime.UtcNow))
+            Errors.Add("Choose an expiry date and time in the future, or select No expiry date.");
+        if (Schedule == "scheduled" && (Model.AvailableFrom is null || Model.AvailableFrom <= DateTime.UtcNow))
+            Errors.Add("Choose an unlock date and time in the future, or select Available immediately.");
+        if (Errors.Count > 0) return;
+        Saving = true;
+        try { Saved = await Api.CreateQuizAsync(Model); }
+        catch (Exception ex) { Errors = ["Quiz could not be saved. " + ex.Message]; }
+        finally { Saving = false; }
+    }
+    private void NewQuiz()
+    {
+        Model = new() { Questions = [new()] };
+        Saved = null; Errors = []; Schedule = "now"; ExpiryMode = "none";
+        ExpiryLocal = DateTime.UtcNow.AddDays(7).AddHours(2);
+        UnlockLocal = DateTime.UtcNow.AddHours(3);
+    }
+}

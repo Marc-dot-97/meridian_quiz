@@ -1,0 +1,50 @@
+@inject SurveyService SurveysApi
+<section class="block dashboard-surveys-block">
+    <div class="dashboard-section-link"><h2>Surveys</h2><AuthorizeView Policy="QuizAuthor"><a class="view-all" href="surveys">Manage surveys →</a></AuthorizeView></div>
+    @if (Loading) { <p class="empty-completed" role="status">Loading surveys...</p> }
+    else if (Error is not null) { <div class="empty-completed" role="alert">@Error <button type="button" class="quiz-start" @onclick="LoadAsync">Retry</button></div> }
+    else if (!Items.Any(s => s.CompletedAt is null)) { <div class="empty-completed">No surveys waiting to be completed.</div> }
+    else
+    {
+        <div class="quiz-list">
+            @foreach (var survey in Items.Where(s => s.CompletedAt is null))
+            {
+                <div class="quiz-card" @key="survey.Id">
+                    <div class="quiz-info"><span class="quiz-title">@survey.Title</span><span class="quiz-meta"><span class="quiz-tag">Survey</span> @survey.QuestionCount questions</span></div>
+                    <a class="quiz-start" href="@($"survey/{survey.Id}")">Open</a>
+                </div>
+            }
+        </div>
+    }
+</section>
+<section class="block completed-surveys-block">
+    <h2>Completed surveys</h2>
+    @if (Loading) { <p class="empty-completed">Loading completed surveys...</p> }
+    else if (Error is not null) { <p class="empty-completed">Completed surveys could not be loaded.</p> }
+    else if (!Items.Any(s => s.CompletedAt is not null)) { <div class="empty-completed">No completed surveys yet.</div> }
+    else
+    {
+        <div class="quiz-list">
+            @foreach (var survey in Items.Where(s => s.CompletedAt is not null).OrderByDescending(s => s.CompletedAt))
+            {
+                <div class="quiz-card completed-quiz-card" @key="survey.Id">
+                    <div class="quiz-info"><span class="quiz-title">@survey.Title</span><span class="quiz-meta">Completed @QuizAvailability.Display(survey.CompletedAt!.Value)</span></div>
+                    <a class="quiz-start" href="@($"survey/{survey.Id}")">View answers</a>
+                </div>
+            }
+        </div>
+    }
+</section>
+@code {
+    private List<DashboardSurveyDto> Items = [];
+    private bool Loading = true;
+    private string? Error;
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        Loading = true; Error = null;
+        try { Items = await SurveysApi.DashboardAsync(); }
+        catch (Exception ex) { Error = "Surveys could not be loaded. " + ex.Message; }
+        finally { Loading = false; }
+    }
+}
