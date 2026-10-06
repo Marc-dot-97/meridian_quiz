@@ -10,7 +10,7 @@ namespace Meridian.Api.Features.Surveys;
 [ApiController]
 [Route("api/surveys")]
 [Authorize]
-public sealed class SurveysController(MeridianDbContext db) : ControllerBase
+public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Features.Reports.EmployeeDirectoryStore directory) : ControllerBase
 {
     [HttpGet]
     [Authorize(Roles = "QuizAuthor,Admin")]
@@ -72,10 +72,22 @@ public sealed class SurveysController(MeridianDbContext db) : ControllerBase
         if (record is null) return NotFound();
         var errors = SurveyValidation.Answers(Decode(record), request);
         if (errors.Count > 0) return BadRequest(new { message = string.Join(" ", errors) });
+        // Anonymity: participation + the user's private copy go to survey_completions; a separate,
+        // unlinkable copy (random id, departments, day only) goes to survey_anonymous_answers.
+        // One SaveChanges = one transaction, so both rows are written or neither.
+        var now = DateTime.UtcNow;
+        var answersJson = JsonSerializer.Serialize(request.Answers);
+        var user = await db.Users.AsNoTracking().SingleAsync(x => x.Id == userId.Value, ct);
         db.SurveyCompletions.Add(new SurveyCompletionRecord
         {
             Id = Guid.NewGuid(), SurveyId = surveyId, UserId = userId.Value,
-            AnswersJson = JsonSerializer.Serialize(request.Answers), SubmittedAt = DateTime.UtcNow
+            AnswersJson = answersJson, SubmittedAt = now, AnonymisedAt = now
+        });
+        db.SurveyAnonymousAnswers.Add(new SurveyAnonymousAnswer
+        {
+            Id = Guid.NewGuid(), SurveyId = surveyId,
+            Departments = SurveyAnonymity.DepartmentsKey(user, await directory.GetAllAsync(ct)),
+            AnswersJson = answersJson, SubmittedOn = SurveyAnonymity.SastDay(now)
         });
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateException)

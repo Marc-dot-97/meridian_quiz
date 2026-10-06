@@ -67,6 +67,9 @@ await using (var scope = app.Services.CreateAsyncScope())
     await db.Database.EnsureCreatedAsync();
     await Meridian.Api.Features.Retention.RetentionMaintenance.EnsureSchemaAsync(connectionString);
     await directoryStore.EnsureSchemaAsync();
+    // Survey anonymity: split table + one-off copy of existing responses (idempotent).
+    await Meridian.Api.Features.Surveys.SurveyAnonymity.EnsureSchemaAsync(connectionString);
+    await Meridian.Api.Features.Surveys.SurveyAnonymity.BackfillAsync(db, directoryStore, app.Logger);
     await Meridian.Api.Features.Retention.RetentionMaintenance.CleanupAsync(connectionString, app.Logger, CancellationToken.None);
     // DEV SEED from the command line: dotnet run --launch-profile https -- --seed   (or --seed-reset / --seed-clear)
     if (args.Any(x => x is "--seed" or "--seed-reset" or "--seed-clear"))

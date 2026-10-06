@@ -9,8 +9,15 @@ public sealed record StaffRow(string Name, string Department, string JobTitle, i
     decimal AverageScore, decimal CpdPoints, long Xp, int SurveysCompleted, DateTime? LastActivitySa);
 public sealed record QuizRow(string Title, string Category, int Attempts, int Participants, decimal PassRate, decimal AverageScore, decimal CpdAwarded);
 public sealed record AttemptRow(string Quiz, string Category, DateTime CompletedSa, decimal Score, bool Passed, decimal Cpd, long Xp);
-public sealed record SurveyQuestionSummary(string Question, List<string> Lines);
-public sealed record SurveySummary(string Title, int Responses, string Note, List<SurveyQuestionSummary> Questions);
+/// <summary>One answer option's share of the anonymous responses to a question.</summary>
+public sealed record SurveyBar(string Label, int Count, decimal Percent);
+public sealed record SurveyQuestionSummary(string Question, List<string> Lines, List<SurveyBar> Bars);
+/// <summary>
+/// Personal report: Questions hold the person's own answers (Lines). Team report: Participated /
+/// NotParticipated are names, Questions hold anonymous Bars/Lines, and Withheld explains hidden results.
+/// </summary>
+public sealed record SurveySummary(string Title, string Note, List<SurveyQuestionSummary> Questions,
+    List<string> Participated, List<string> NotParticipated, string? Withheld);
 
 public sealed class ReportData
 {
@@ -36,6 +43,7 @@ public static class PdfReportBuilder
     private static readonly Color Orange = new(0xE4, 0x64, 0x34);
     private static readonly Color Stripe = new(0xF2, 0xF5, 0xF5);
     private static readonly Color Muted = new(0x6B, 0x7A, 0x80);
+    private static readonly Color Track = new(0xE6, 0xEB, 0xEC);
 
     public static byte[] Build(ReportData d)
     {
@@ -126,24 +134,15 @@ public static class PdfReportBuilder
         {
             Heading(section, d.Personal ? "Survey responses" : "Survey results");
             if (d.Surveys.Count == 0) Empty(section, "No surveys in this period.");
-            foreach (var s in d.Surveys)
+            if (!d.Personal && d.Surveys.Count > 0)
             {
-                var title = section.AddParagraph();
-                title.Format.SpaceBefore = Unit.FromPoint(8); title.Format.KeepWithNext = true;
-                title.AddFormattedText(s.Title, TextFormat.Bold);
-                var meta = title.AddFormattedText($"   {s.Note}"); meta.Font.Color = Muted;
-                foreach (var q in s.Questions)
-                {
-                    var qp = section.AddParagraph(q.Question);
-                    qp.Format.LeftIndent = Unit.FromCentimeter(0.4); qp.Format.SpaceBefore = Unit.FromPoint(4);
-                    qp.Format.Font.Bold = true; qp.Format.Font.Size = 8.5; qp.Format.KeepWithNext = true;
-                    foreach (var line in q.Lines)
-                    {
-                        var lp = section.AddParagraph(line);
-                        lp.Format.LeftIndent = Unit.FromCentimeter(0.8); lp.Format.Font.Size = 8.5;
-                    }
-                }
+                var privacy = section.AddParagraph(
+                    "Participation is listed by name. Answers are anonymous: they are stored without any link to a person, " +
+                    $"and results are hidden when fewer than {Meridian.Api.Features.Surveys.SurveyAnonymity.MinimumResponses} people responded.");
+                privacy.Format.Font.Size = 7.5; privacy.Format.Font.Italic = true; privacy.Format.Font.Color = Muted;
+                privacy.Format.SpaceAfter = Unit.FromPoint(4);
             }
+            foreach (var s in d.Surveys) RenderSurvey(section, s, d.Personal);
         }
 
         if (!d.Personal && d.NotRegistered.Count > 0)
@@ -158,6 +157,76 @@ public static class PdfReportBuilder
         using var stream = new MemoryStream();
         renderer.PdfDocument.Save(stream, false);
         return stream.ToArray();
+    }
+
+    private static void RenderSurvey(Section section, SurveySummary s, bool personal)
+    {
+        var title = section.AddParagraph();
+        title.Format.SpaceBefore = Unit.FromPoint(12); title.Format.KeepWithNext = true;
+        title.AddFormattedText(s.Title, TextFormat.Bold).Font.Size = 10.5;
+        if (s.Note.Length > 0) { var meta = title.AddFormattedText($"   {s.Note}"); meta.Font.Color = Muted; meta.Font.Size = 8; }
+
+        if (!personal)
+        {
+            // Split 1: who took part / who did not (linked to people).
+            NameList(section, $"Took part ({s.Participated.Count})", s.Participated, Green);
+            NameList(section, $"Did not take part ({s.NotParticipated.Count})", s.NotParticipated, Orange);
+            // Split 2: anonymous results.
+            var label = section.AddParagraph("Anonymous results");
+            label.Format.SpaceBefore = Unit.FromPoint(6); label.Format.KeepWithNext = true;
+            label.Format.Font.Size = 7; label.Format.Font.Bold = true; label.Format.Font.Color = Muted;
+            if (s.Withheld is not null) { Empty(section, s.Withheld); return; }
+        }
+
+        foreach (var q in s.Questions)
+        {
+            var qp = section.AddParagraph(q.Question);
+            qp.Format.LeftIndent = Unit.FromCentimeter(0.4); qp.Format.SpaceBefore = Unit.FromPoint(5);
+            qp.Format.Font.Bold = true; qp.Format.Font.Size = 8.5; qp.Format.KeepWithNext = true;
+            foreach (var bar in q.Bars) Bar(section, bar);
+            foreach (var line in q.Lines)
+            {
+                var lp = section.AddParagraph(line);
+                lp.Format.LeftIndent = Unit.FromCentimeter(0.8); lp.Format.Font.Size = 8.5;
+            }
+        }
+    }
+
+    private static void NameList(Section section, string heading, List<string> names, Color accent)
+    {
+        var h = section.AddParagraph(heading);
+        h.Format.LeftIndent = Unit.FromCentimeter(0.4); h.Format.SpaceBefore = Unit.FromPoint(4);
+        h.Format.Font.Size = 8; h.Format.Font.Bold = true; h.Format.Font.Color = accent; h.Format.KeepWithNext = true;
+        var p = section.AddParagraph(names.Count == 0 ? "None" : string.Join("  ·  ", names));
+        p.Format.LeftIndent = Unit.FromCentimeter(0.4); p.Format.Font.Size = 8;
+    }
+
+    /// <summary>A horizontal % bar: label | filled | track | "62% (5)". One small table per bar.</summary>
+    private static void Bar(Section section, SurveyBar bar)
+    {
+        const double labelCm = 5.6, barCm = 9.0, valueCm = 2.6;
+        var filled = Math.Round(barCm * (double)Math.Clamp(bar.Percent, 0m, 100m) / 100d, 2);
+        var track = Math.Round(barCm - filled, 2);
+        var table = section.AddTable();
+        table.Borders.Visible = false;
+        table.Rows.LeftIndent = Unit.FromCentimeter(0.8);
+        table.Format.Font.Size = 8;
+        table.AddColumn(Unit.FromCentimeter(labelCm));
+        if (filled >= 0.05) table.AddColumn(Unit.FromCentimeter(filled));
+        if (track >= 0.05) table.AddColumn(Unit.FromCentimeter(track));
+        table.AddColumn(Unit.FromCentimeter(valueCm));
+        var row = table.AddRow();
+        row.Height = Unit.FromCentimeter(0.46);
+        row.HeightRule = RowHeightRule.AtLeast;
+        row.VerticalAlignment = VerticalAlignment.Center;
+        row.TopPadding = Unit.FromPoint(1.5); row.BottomPadding = Unit.FromPoint(1.5);
+        var i = 0;
+        row.Cells[i++].AddParagraph(bar.Label);
+        if (filled >= 0.05) row.Cells[i++].Shading.Color = Orange;
+        if (track >= 0.05) row.Cells[i++].Shading.Color = Track;
+        var value = row.Cells[i].AddParagraph($"{bar.Percent:0}%  ({bar.Count})");
+        value.Format.Alignment = ParagraphAlignment.Right;
+        value.Format.Font.Bold = true;
     }
 
     private static string ShortDept(string department) =>

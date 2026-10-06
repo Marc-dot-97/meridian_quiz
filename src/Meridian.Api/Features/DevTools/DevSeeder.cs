@@ -248,9 +248,15 @@ public static class DevSeeder
                     _ => new SurveyAnswerDto { QuestionId = q.Id, Text = rng.NextDouble() < 0.6 ? Comments[rng.Next(Comments.Length)] : null }
                 }).Where(a => a.ChoiceIndex is not null || a.Rating is not null || a.Text is not null).ToList();
                 var submitted = s.CreatedAt.AddHours(rng.Next(1, Math.Max(2, (int)(now - s.CreatedAt).TotalHours)));
+                var answersJson = JsonSerializer.Serialize(answers);
                 db.SurveyCompletions.Add(new SurveyCompletionRecord
                 {
-                    Id = Guid.NewGuid(), SurveyId = s.Id, UserId = u.Id, AnswersJson = JsonSerializer.Serialize(answers), SubmittedAt = submitted
+                    Id = Guid.NewGuid(), SurveyId = s.Id, UserId = u.Id, AnswersJson = answersJson, SubmittedAt = submitted, AnonymisedAt = now
+                });
+                db.SurveyAnonymousAnswers.Add(new SurveyAnonymousAnswer
+                {
+                    Id = Guid.NewGuid(), SurveyId = s.Id, Departments = DirectoryNames.CleanDepartment(u.Department),
+                    AnswersJson = answersJson, SubmittedOn = Meridian.Api.Features.Surveys.SurveyAnonymity.SastDay(submitted)
                 });
                 responses++;
             }
@@ -329,6 +335,7 @@ public static class DevSeeder
         settings.ForEach(s => s.ActiveSurveyId = null);
         db.SurveyCompletions.RemoveRange(await db.SurveyCompletions.Where(x => surveyIds.Contains(x.SurveyId) || userIds.Contains(x.UserId)).ToListAsync(ct));
         db.SurveyResponses.RemoveRange(await db.SurveyResponses.Where(x => surveyIds.Contains(x.SurveyId) || userIds.Contains(x.UserId)).ToListAsync(ct));
+        db.SurveyAnonymousAnswers.RemoveRange(await db.SurveyAnonymousAnswers.Where(x => surveyIds.Contains(x.SurveyId)).ToListAsync(ct));
         var surveys = await db.Surveys.Where(s => surveyIds.Contains(s.Id)).ToListAsync(ct);
 
         db.CpdLedgerEntries.RemoveRange(await db.CpdLedgerEntries.Where(x => quizIds.Contains(x.QuizId) || userIds.Contains(x.UserId)).ToListAsync(ct));

@@ -89,6 +89,7 @@ public static class RetentionMaintenance
                         {
                             await Delete("UPDATE survey_settings SET active_survey_id = NULL WHERE active_survey_id = @id");
                             await Delete("DELETE FROM survey_completions WHERE survey_id = @id");
+                            await Delete("DELETE FROM survey_anonymous_answers WHERE survey_id = @id");
                             await Delete("DELETE FROM survey_responses WHERE survey_id = @id");
                             await Delete("DELETE FROM surveys WHERE id = @id");
                         }

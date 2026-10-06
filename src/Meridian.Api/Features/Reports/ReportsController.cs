@@ -59,6 +59,7 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
         var requested = department?.Trim() ?? "";
 
         bool personal;
+        var wholeCompany = false;   // HR/SuperAdmin "All departments": anonymous results are not filtered by department
         List<string> departments;
         string scopeLabel;
         if (scope.Role == ReportRole.Staff || requested.Equals("me", StringComparison.OrdinalIgnoreCase))
@@ -68,6 +69,7 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
         else if (requested.Length == 0 || requested.Equals("all", StringComparison.OrdinalIgnoreCase))
         {
             personal = false; departments = scope.Departments.ToList();
+            wholeCompany = scope.Role != ReportRole.LineManager;
             scopeLabel = scope.Role == ReportRole.LineManager
                 ? (departments.Count == 1 ? departments[0] : $"My departments ({departments.Count})")
                 : "All departments";
@@ -107,6 +109,29 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
                 .OrderByDescending(s => s.CreatedAt).ToListAsync(ct)
             : new List<SurveyRecord>();
 
+        // ---- Survey split for team reports ----
+        // Split 1 (who took part): survey_completions, user IDs only, never its answers.
+        // Split 2 (what was answered): survey_anonymous_answers, which has no user link at all.
+        // Both cover everything up to the end of the chosen period.
+        var reportSurveyIds = surveyRecords.Select(r => r.Id).ToList();
+        var participation = new List<(Guid SurveyId, ulong UserId)>();
+        var anonymous = new List<SurveyAnonymousAnswer>();
+        if (withSurveys && !personal && reportSurveyIds.Count > 0)
+        {
+            participation = (await db.SurveyCompletions.AsNoTracking()
+                    .Where(c => reportSurveyIds.Contains(c.SurveyId) && ids.Contains(c.UserId) && c.SubmittedAt < endUtc)
+                    .Select(c => new { c.SurveyId, c.UserId }).ToListAsync(ct))
+                .Select(c => (c.SurveyId, c.UserId)).ToList();
+            var lastDay = to.ToDateTime(TimeOnly.MinValue);
+            anonymous = await db.SurveyAnonymousAnswers.AsNoTracking()
+                .Where(a => reportSurveyIds.Contains(a.SurveyId) && a.SubmittedOn <= lastDay)
+                .ToListAsync(ct);
+            if (!wholeCompany)
+                anonymous = anonymous.Where(a => Meridian.Api.Features.Surveys.SurveyAnonymity.SplitDepartments(a.Departments).Any(deptSet.Contains)).ToList();
+        }
+        var notRegistered = personal ? new List<string>()
+            : NotRegistered(entries, deptSet, await db.Users.AsNoTracking().Select(u => u.Email).ToListAsync(ct));
+
         var data = new ReportData
         {
             ScopeLabel = scopeLabel,
@@ -131,8 +156,12 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
             Quizzes = personal ? [] : attempts.GroupBy(a => a.QuizId).Select(g => new QuizRow(g.First().Quiz.Title, g.First().Quiz.Category.Name,
                 g.Count(), g.Select(a => a.UserId).Distinct().Count(), g.Count(a => a.Passed) * 100m / g.Count(),
                 g.Average(a => a.ScorePercent), g.Sum(a => a.CpdPointsEarned))).OrderByDescending(q => q.Attempts).ToList(),
-            Surveys = surveyRecords.Select(r => Summarise(r, completions.Where(c => c.SurveyId == r.Id).ToList(), personal, users.Count)).ToList(),
-            NotRegistered = personal ? [] : NotRegistered(entries, deptSet, await db.Users.AsNoTracking().Select(u => u.Email).ToListAsync(ct)),
+            Surveys = personal
+                ? surveyRecords.Select(r => PersonalSurvey(r, completions.Where(c => c.SurveyId == r.Id).ToList())).ToList()
+                : surveyRecords.Select(r => TeamSurvey(r, users,
+                    participation.Where(p => p.SurveyId == r.Id).Select(p => p.UserId).ToHashSet(),
+                    anonymous.Where(a => a.SurveyId == r.Id).ToList(), notRegistered)).ToList(),
+            NotRegistered = notRegistered,
         };
 
         if (personal)
@@ -165,54 +194,95 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
         return File(pdf, "application/pdf", $"Meridian-Report-{slug}-{from:yyyyMMdd}-{to:yyyyMMdd}.pdf");
     }
 
-    private static SurveySummary Summarise(SurveyRecord record, List<SurveyCompletionRecord> responses, bool personal, int peopleInScope)
+    /// <summary>Personal report: the person's own survey with each question and the answer they picked.</summary>
+    private static SurveySummary PersonalSurvey(SurveyRecord record, List<SurveyCompletionRecord> mine)
     {
         var survey = JsonSerializer.Deserialize<SurveyDto>(record.DefinitionJson)!;
-        var answers = responses.Select(r => JsonSerializer.Deserialize<List<SurveyAnswerDto>>(r.AnswersJson) ?? []).ToList();
+        var answers = mine.Count == 0 ? new List<SurveyAnswerDto>()
+            : JsonSerializer.Deserialize<List<SurveyAnswerDto>>(mine[0].AnswersJson) ?? [];
+        var questions = survey.Questions.Select(q =>
+        {
+            var a = answers.FirstOrDefault(x => x.QuestionId == q.Id);
+            var text = a is null ? "No answer" : q.Type switch
+            {
+                SurveyQuestionType.MultipleChoice when a.ChoiceIndex is int i && i >= 0 && i < q.Options.Count => q.Options[i],
+                SurveyQuestionType.Rating when a.Rating is int r => $"{r} / 5",
+                _ => string.IsNullOrWhiteSpace(a.Text) ? "No answer" : a.Text!
+            };
+            return new SurveyQuestionSummary(q.Text, [$"Your answer: {text}"], []);
+        }).ToList();
+        var note = mine.Count > 0 ? $"Submitted {mine[0].SubmittedAt + Sast:dd MMM yyyy}" : "";
+        return new SurveySummary(record.Title, note, questions, [], [], null);
+    }
+
+    /// <summary>
+    /// Team report (line manager / HR / SuperAdmin):
+    /// split 1 = named lists of who took part and who did not; split 2 = anonymous % per answer,
+    /// withheld below SurveyAnonymity.MinimumResponses so small groups cannot be identified.
+    /// </summary>
+    private static SurveySummary TeamSurvey(SurveyRecord record, List<User> users, HashSet<ulong> tookPart,
+        List<SurveyAnonymousAnswer> rows, List<string> notRegistered)
+    {
+        var survey = JsonSerializer.Deserialize<SurveyDto>(record.DefinitionJson)!;
+        var participated = users.Where(u => tookPart.Contains(u.Id)).Select(u => u.DisplayName)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+        var notParticipated = users.Where(u => !tookPart.Contains(u.Id)).Select(u => u.DisplayName)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .Concat(notRegistered.Select(n => $"{n} (not registered)")).ToList();
+        var invited = participated.Count + notParticipated.Count;
+        var note = $"{participated.Count} of {invited} took part" +
+                   (invited == 0 ? "" : $" ({participated.Count * 100m / invited:0}%)") +
+                   $"  ·  {rows.Count} anonymous response(s)";
+
+        if (rows.Count < Meridian.Api.Features.Surveys.SurveyAnonymity.MinimumResponses)
+            return new SurveySummary(record.Title, note, [], participated, notParticipated,
+                $"Results hidden: fewer than {Meridian.Api.Features.Surveys.SurveyAnonymity.MinimumResponses} responses, so answers could identify individuals.");
+
+        // Rows are ordered by their random id, so the order says nothing about who answered when.
+        var answerSets = rows.OrderBy(r => r.Id).Select(r => Meridian.Api.Features.Surveys.SurveyAnonymity.Answers(r.AnswersJson)).ToList();
         var questions = new List<SurveyQuestionSummary>();
         foreach (var q in survey.Questions)
         {
-            var given = answers.Select(list => list.FirstOrDefault(a => a.QuestionId == q.Id)).Where(a => a is not null).Select(a => a!).ToList();
+            var given = answerSets.Select(set => set.FirstOrDefault(a => a.QuestionId == q.Id)).Where(a => a is not null).Select(a => a!).ToList();
+            var bars = new List<SurveyBar>();
             var lines = new List<string>();
-            if (personal)
+            static decimal Pct(int n, int total) => total == 0 ? 0 : Math.Round(n * 100m / total, 1);
+            switch (q.Type)
             {
-                var a = given.FirstOrDefault();
-                lines.Add(a is null ? "No answer" : q.Type switch
+                case SurveyQuestionType.MultipleChoice:
                 {
-                    SurveyQuestionType.MultipleChoice when a.ChoiceIndex is int i && i >= 0 && i < q.Options.Count => q.Options[i],
-                    SurveyQuestionType.Rating when a.Rating is int r => $"{r} / 5",
-                    _ => string.IsNullOrWhiteSpace(a.Text) ? "No answer" : a.Text!
-                });
-            }
-            else if (q.Type == SurveyQuestionType.MultipleChoice)
-            {
-                var total = given.Count(a => a.ChoiceIndex is not null);
-                for (var i = 0; i < q.Options.Count; i++)
+                    var answered = given.Count(a => a.ChoiceIndex is int i && i >= 0 && i < q.Options.Count);
+                    for (var i = 0; i < q.Options.Count; i++)
+                    {
+                        var n = given.Count(a => a.ChoiceIndex == i);
+                        bars.Add(new SurveyBar(q.Options[i], n, Pct(n, answered)));
+                    }
+                    lines.Add($"{answered} answered");
+                    break;
+                }
+                case SurveyQuestionType.Rating:
                 {
-                    var n = given.Count(a => a.ChoiceIndex == i);
-                    lines.Add($"{q.Options[i]}: {n}" + (total == 0 ? "" : $" ({n * 100m / total:0}%)"));
+                    var ratings = given.Where(a => a.Rating is >= 1 and <= 5).Select(a => a.Rating!.Value).ToList();
+                    for (var star = 5; star >= 1; star--)
+                    {
+                        var n = ratings.Count(r => r == star);
+                        bars.Add(new SurveyBar($"{star} / 5", n, Pct(n, ratings.Count)));
+                    }
+                    lines.Add(ratings.Count == 0 ? "No ratings" : $"Average {ratings.Average():0.0} / 5 from {ratings.Count} rating(s)");
+                    break;
+                }
+                default:
+                {
+                    var texts = given.Where(a => !string.IsNullOrWhiteSpace(a.Text)).Select(a => a.Text!.Trim()).ToList();
+                    lines.Add(texts.Count == 0 ? "No comments" : $"{texts.Count} anonymous comment(s):");
+                    lines.AddRange(texts.Take(20).Select(t => $"“{t}”"));
+                    if (texts.Count > 20) lines.Add($"…and {texts.Count - 20} more.");
+                    break;
                 }
             }
-            else if (q.Type == SurveyQuestionType.Rating)
-            {
-                var ratings = given.Where(a => a.Rating is not null).Select(a => a.Rating!.Value).ToList();
-                lines.Add(ratings.Count == 0 ? "No ratings yet" :
-                    $"Average {ratings.Average():0.0} / 5 from {ratings.Count} rating(s)   ·   " +
-                    string.Join("  ", Enumerable.Range(1, 5).Select(s => $"{s}★ {ratings.Count(r => r == s)}")));
-            }
-            else
-            {
-                var texts = given.Where(a => !string.IsNullOrWhiteSpace(a.Text)).Select(a => a.Text!.Trim()).ToList();
-                if (texts.Count == 0) lines.Add("No comments");
-                lines.AddRange(texts.Take(15).Select(t => $"“{t}”"));
-                if (texts.Count > 15) lines.Add($"…and {texts.Count - 15} more comment(s).");
-            }
-            questions.Add(new SurveyQuestionSummary(q.Text, lines));
+            questions.Add(new SurveyQuestionSummary(q.Text, lines, bars));
         }
-        var note = personal
-            ? (responses.Count > 0 ? $"Submitted {responses[0].SubmittedAt + Sast:dd MMM yyyy}" : "")
-            : $"{responses.Count} response(s) from {peopleInScope} registered staff";
-        return new SurveySummary(record.Title, responses.Count, note, questions);
+        return new SurveySummary(record.Title, note, questions, participated, notParticipated, null);
     }
 
     private static List<string> NotRegistered(IReadOnlyList<DirectoryEmployee> entries, HashSet<string> departments, List<string> registeredEmails)
