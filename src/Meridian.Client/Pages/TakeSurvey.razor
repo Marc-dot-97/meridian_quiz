@@ -1,0 +1,8 @@
+@page "/survey/{SurveyId:guid}"
+@attribute [Authorize]
+<PageTitle>Meridian | Survey</PageTitle>
+<div class="surveys-page survey-ui">
+    <BrandMark Page="Survey" />
+    <SurveyForm SurveyId="SurveyId" @key="SurveyId" />
+</div>
+@code { [Parameter] public Guid SurveyId { get; set; } }

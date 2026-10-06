@@ -1,0 +1,32 @@
+@* Meridian logo: arc-tile mark + wordmark, linking home. Optional breadcrumb: "Meridian / {Page}". *@
+<div class="brand-lockup">
+    <a class="brand-mark" href="/" aria-label="Meridian home">
+        <span class="brand-tile">
+            <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                <path d="M8,34 A16,16 0 0 1 40,34" fill="none" stroke="#F89939" stroke-width="3.4" stroke-linecap="round" />
+                <circle cx="24" cy="18" r="3.8" fill="#E46434" />
+                <path d="M15,38 V27 L24,33 L33,27 V38" fill="none" stroke="#FBFBF9" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+            </svg>
+        </span>
+        <span class="brand-name">Meridian</span>
+    </a>
+    @if (!string.IsNullOrWhiteSpace(Page))
+    {
+        <span class="brand-sep" aria-hidden="true">/</span>
+        @if (string.IsNullOrWhiteSpace(PageHref))
+        {
+            <span class="brand-page">@Page</span>
+        }
+        else
+        {
+            <a class="brand-page" href="@PageHref">@Page</a>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Current page name shown after the logo, e.g. "Reports".</summary>
+    [Parameter] public string? Page { get; set; }
+    /// <summary>Optional link for the page name (e.g. back to "quizzes" from a quiz's details).</summary>
+    [Parameter] public string? PageHref { get; set; }
+}

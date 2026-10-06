@@ -16,9 +16,9 @@
             </div>
 
             <button type="button"
-                    class="signout-button"
+                    class="btn-arc btn-arc--signout"
                     @onclick="SignOut">
-                Sign out
+                <span>Sign out</span>
             </button>
 
         </div>
@@ -48,21 +48,9 @@
                 .Select(x => char.ToUpperInvariant(x[0])));
     }
 
-    private void SignOut()
+    private async Task SignOut()
     {
-        var useLocalMode =
-            Configuration.GetValue<bool>(
-                "Development:UseLocalMode");
-
-        if (useLocalMode)
-        {
-            LocalAuth.SignOut();
-            Navigation.NavigateTo("/login");
-            return;
-        }
-
-        Navigation.NavigateTo(
-            "authentication/logout",
-            forceLoad: true);
+        await LocalAuth.SignOutAsync();
+        Navigation.NavigateTo("/login", forceLoad: true);
     }
 }

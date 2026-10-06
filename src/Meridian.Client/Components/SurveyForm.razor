@@ -1,0 +1,121 @@
+@inject SurveyService SurveysApi
+
+<div class="survey-ui standalone-survey">
+    @if (Loading)
+    { <p class="survey-hint" role="status">Loading survey…</p> }
+    else if (Submitted)
+    { <section class="survey-card survey-success">
+        <h2>@Survey?.Title</h2><p role="status">Survey completed @((CompletedAt is DateTime date) ? QuizAvailability.Display(date) : ""). Thank you for your feedback.</p>
+        @if (Survey is not null)
+        {
+            @foreach (var question in Survey.Questions)
+            {
+                <div class="survey-response-question"><strong>@question.Text</strong><p style="white-space:pre-wrap; overflow-wrap:anywhere;">@AnswerText(question)</p></div>
+            }
+        }
+        <a class="survey-primary" href="/">Back to dashboard</a>
+      </section> }
+    else if (Survey is not null)
+    {
+        <section class="survey-card survey-accent-card">
+            <p class="survey-eyebrow">SURVEY</p><h2>@Survey.Title</h2>
+            @if (!string.IsNullOrWhiteSpace(Survey.Description)) { <p>@Survey.Description</p> }
+            <p class="survey-hint">Questions marked * are required.</p>
+            <EditForm Model="Response" OnSubmit="SubmitAsync">
+                <fieldset class="survey-fieldset" disabled="@Saving">
+                    @foreach (var question in Survey.Questions)
+                    {
+                        var answer = Response.Answers.Single(a => a.QuestionId == question.Id);
+                        <fieldset class="survey-response-question" @key="question.Id">
+                            <legend>@question.Text @(question.Required ? "*" : "(optional)")</legend>
+                            @if (question.Type == SurveyQuestionType.ShortText)
+                            { <InputTextArea maxlength="2000" aria-label="@question.Text" @bind-Value="answer.Text" /> }
+                            else if (question.Type == SurveyQuestionType.MultipleChoice)
+                            {
+                                <InputRadioGroup TValue="int?" @bind-Value="answer.ChoiceIndex" Name="@($"survey-{question.Id}")">
+                                    @for (var i = 0; i < question.Options.Count; i++)
+                                    { <label class="survey-choice"><InputRadio TValue="int?" Value="@((int?)i)" /><span>@question.Options[i]</span></label> }
+                                </InputRadioGroup>
+                            }
+                            else
+                            {
+                                <InputRadioGroup TValue="int?" @bind-Value="answer.Rating" Name="@($"survey-{question.Id}")">
+                                    <div class="survey-rating">@for (var i = 1; i <= 5; i++)
+                                    { <label class="survey-choice"><InputRadio TValue="int?" Value="@((int?)i)" /><span>@i</span></label> }</div>
+                                </InputRadioGroup>
+                            }
+                            @if (!question.Required && question.Type != SurveyQuestionType.ShortText)
+                            { <button type="button" class="survey-text-button" @onclick="() => Clear(answer)">Clear answer</button> }
+                        </fieldset>
+                    }
+                    @if (Errors.Count > 0)
+                    { <div class="survey-errors" role="alert"><ul>@foreach (var error in Errors) { <li>@error</li> }</ul></div> }
+                    <div class="survey-actions"><a class="survey-secondary" href="/">Back to dashboard</a><button type="submit" class="survey-primary">@(Saving ? "Submitting…" : "Submit feedback")</button></div>
+                </fieldset>
+            </EditForm>
+        </section>
+    }
+    @if (LoadError is not null)
+    { <p class="survey-errors" role="alert">@LoadError <button type="button" class="survey-text-button" @onclick="LoadAsync">Retry</button></p> }
+    @if (Errors.Count > 0 && Survey is not null)
+    { <button type="button" class="survey-text-button" @onclick="LoadAsync" disabled="@Saving">Reload survey</button> }
+</div>
+
+@code {
+    [Parameter] public Guid SurveyId { get; set; }
+    private SurveyDto? Survey;
+    private SubmitSurveyRequest Response = new();
+    private List<string> Errors = [];
+    private string? LoadError;
+    private DateTime? CompletedAt;
+    private bool Loading = true, Saving, Submitted;
+    private Guid? LoadedSurvey;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (LoadedSurvey == SurveyId) return;
+        LoadedSurvey = SurveyId;
+        await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        Loading = true; LoadError = null; Errors = []; Survey = null; Submitted = false;
+        try
+        {
+            var data = await SurveysApi.GetAsync(SurveyId);
+            Survey = data.Survey; Submitted = data.CompletedAt is not null; CompletedAt = data.CompletedAt;
+            Response = new() { Answers = data.Answers ?? Survey?.Questions.Select(q => new SurveyAnswerDto { QuestionId = q.Id }).ToList() ?? [] };
+        }
+        catch (Exception ex) { LoadError = "The survey could not be loaded. " + ex.Message; }
+        finally { Loading = false; }
+    }
+    private string AnswerText(SurveyQuestionDto question)
+    {
+        var answer = Response.Answers.FirstOrDefault(a => a.QuestionId == question.Id);
+        if (answer is null) return "Not answered";
+        return question.Type switch
+        {
+            SurveyQuestionType.MultipleChoice => answer.ChoiceIndex is int i && i >= 0 && i < question.Options.Count ? question.Options[i] : "Not answered",
+            SurveyQuestionType.Rating => answer.Rating is int rating ? $"{rating} / 5" : "Not answered",
+            _ => string.IsNullOrWhiteSpace(answer.Text) ? "Not answered" : answer.Text
+        };
+    }
+    private static void Clear(SurveyAnswerDto answer) { answer.ChoiceIndex = null; answer.Rating = null; }
+    private async Task SubmitAsync(EditContext context)
+    {
+        if (Saving || Survey is null || Submitted) return;
+        Errors = SurveyValidation.Answers(Survey, Response);
+        if (!context.Validate() || Errors.Count > 0) return;
+        Saving = true;
+        try
+        {
+            await SurveysApi.SubmitAsync(Survey.Id, Response);
+            Submitted = true; CompletedAt = DateTime.UtcNow;
+            // Read the saved version, including if another tab submitted first.
+            var saved = await SurveysApi.GetAsync(Survey.Id);
+            Response.Answers = saved.Answers ?? Response.Answers;
+            CompletedAt = saved.CompletedAt ?? CompletedAt;
+        }
+        catch (Exception ex) { if (Submitted) LoadError = "Saved, but the response could not be reloaded. " + ex.Message; else Errors = ["Feedback could not be saved. " + ex.Message]; }
+        finally { Saving = false; }
+    }
+}

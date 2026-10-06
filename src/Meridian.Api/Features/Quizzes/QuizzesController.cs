@@ -1,4 +1,4 @@
-﻿using Meridian.Api.Data;
+using Meridian.Api.Data;
 using Meridian.Api.Features.Quizzes.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +8,7 @@ namespace Meridian.Api.Features.Quizzes;
 
 [ApiController]
 [Route("api/quizzes")]
+[Authorize]
 public sealed class QuizzesController : ControllerBase
 {
     private readonly MeridianDbContext _dbContext;
@@ -20,7 +21,6 @@ public sealed class QuizzesController : ControllerBase
 
 
     // GET /api/quizzes
-    [AllowAnonymous]
     [HttpGet]
     public async Task<
         ActionResult<IEnumerable<QuizSummaryDto>>>
@@ -36,6 +36,8 @@ public sealed class QuizzesController : ControllerBase
                     Id = q.Id,
 
                     Title = q.Title,
+                    ExpiresAt = q.ExpiresAt.HasValue ? DateTime.SpecifyKind(q.ExpiresAt.Value, DateTimeKind.Utc) : null,
+                    AvailableFrom = q.AvailableFrom.HasValue ? DateTime.SpecifyKind(q.AvailableFrom.Value, DateTimeKind.Utc) : null,
 
                     Category = q.Category.Name,
 
@@ -55,7 +57,6 @@ public sealed class QuizzesController : ControllerBase
 
 
     // GET /api/quizzes/1
-    [AllowAnonymous]
     [HttpGet("{id:long}")]
     public async Task<ActionResult<QuizDetailsDto>>
         GetQuiz(ulong id)
@@ -71,6 +72,8 @@ public sealed class QuizzesController : ControllerBase
                     Id = q.Id,
 
                     Title = q.Title,
+                    ExpiresAt = q.ExpiresAt.HasValue ? DateTime.SpecifyKind(q.ExpiresAt.Value, DateTimeKind.Utc) : null,
+                    AvailableFrom = q.AvailableFrom.HasValue ? DateTime.SpecifyKind(q.AvailableFrom.Value, DateTimeKind.Utc) : null,
 
                     Category = q.Category.Name,
 

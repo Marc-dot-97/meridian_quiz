@@ -10,6 +10,7 @@ namespace Meridian.Api.Features.Users;
 
 [ApiController]
 [Route("api/users")]
+[Authorize(Roles = "Admin")]
 public sealed class UsersController : ControllerBase
 {
     private readonly MeridianDbContext _dbContext;
@@ -23,7 +24,6 @@ public sealed class UsersController : ControllerBase
     // GET: api/users
     // ---------------------------------------------------------
 
-    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers()
     {
@@ -52,7 +52,6 @@ public sealed class UsersController : ControllerBase
     // GET: api/users/5
     // ---------------------------------------------------------
 
-    [AllowAnonymous]
     [HttpGet("{id:long}")]
     public async Task<ActionResult<UserDto>> GetUser(ulong id)
     {
@@ -89,7 +88,6 @@ public sealed class UsersController : ControllerBase
     // POST: api/users
     // ---------------------------------------------------------
 
-    [AllowAnonymous]
     [HttpPost]
     public async Task<ActionResult<UserDto>> CreateUser(
         CreateUserRequest request)
@@ -181,7 +179,6 @@ public sealed class UsersController : ControllerBase
     // PUT: api/users/5
     // ---------------------------------------------------------
 
-    [AllowAnonymous]
     [HttpPut("{id:long}")]
     public async Task<ActionResult<UserDto>> UpdateUser(
         ulong id,

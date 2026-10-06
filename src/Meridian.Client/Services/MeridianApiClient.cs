@@ -1,11 +1,18 @@
 using System.Net.Http.Json;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Components.Authorization;
 using Meridian.Shared.DTOs;
 
 namespace Meridian.Client.Services;
 
-public sealed class MeridianApiClient
+public sealed partial class MeridianApiClient
 {
     private readonly HttpClient _http;
+    private readonly AuthenticationStateProvider _auth;
+    // Local rankings contain only completed attempts from this running session.
+    private readonly List<LocalRankingResult> _rankingResults = [];
+    private sealed record LocalRankingResult(string UserKey, string DisplayName,
+        DateTime CompletedAt, int Xp, int ScorePercent);
     private readonly bool _local;
     private readonly Dictionary<Guid, MockAttempt> _attempts = [];
     private readonly List<CompletedQuizDto> _completedQuizzes =
@@ -21,10 +28,12 @@ public sealed class MeridianApiClient
     private int _streak = 0;
     private int _longestStreak = 0;
 
-    public MeridianApiClient(HttpClient http, IConfiguration configuration)
+    public MeridianApiClient(HttpClient http, IConfiguration configuration, Microsoft.JSInterop.IJSRuntime js, AuthenticationStateProvider auth)
     {
         _http = http;
-        _local = configuration.GetValue<bool>("Development:UseLocalMode");
+        _auth = auth;
+        _js = js;
+        _local = false; // Quizzes, attempts and progress use MySQL. Surveys retain their separate setting.
     }
 
     public async Task<IReadOnlyList<QuizSummaryDto>> GetQuizzesAsync(CancellationToken ct = default)
@@ -32,7 +41,8 @@ public sealed class MeridianApiClient
         if (_local)
         {
             await Task.Delay(100, ct);
-            return MockQuizzes;
+            await LoadCreatedQuizzesAsync();
+            return AllLocalQuizzes();
         }
 
         using var response = await _http.GetAsync("api/quizzes", ct);
@@ -58,7 +68,8 @@ public sealed class MeridianApiClient
         if (_local)
         {
             await Task.Delay(80, ct);
-            return GetQuiz(quizId);
+            await LoadCreatedQuizzesAsync();
+            return GetLocalQuiz(quizId);
         }
         using var response = await _http.GetAsync($"api/quizzes/{quizId}", ct);
         return await ReadAsync<QuizDetailsDto>(response, ct);
@@ -70,16 +81,20 @@ public sealed class MeridianApiClient
         {
             await Task.Delay(80, ct);
 
-            var quizSummary = MockQuizzes.FirstOrDefault(x => x.Id == quizId)
+            await LoadCreatedQuizzesAsync();
+            var quizSummary = AllLocalQuizzes().FirstOrDefault(x => x.Id == quizId)
                 ?? throw new InvalidOperationException("Quiz not found.");
 
-            if (quizSummary.AvailableFrom is DateTime availableFrom && DateTime.Today < availableFrom.Date)
+            if (QuizAvailability.IsExpired(quizSummary.ExpiresAt))
+                throw new InvalidOperationException("This quiz has expired and no longer accepts new attempts.");
+
+            if (quizSummary.AvailableFrom is DateTime availableFrom && !QuizAvailability.IsUnlocked(availableFrom))
             {
                 throw new InvalidOperationException(
-                    $"This quiz unlocks on {availableFrom:dd MMMM yyyy}.");
+                    $"This quiz unlocks on {QuizAvailability.Display(availableFrom)}.");
             }
 
-            var questions = BuildQuestions(quizId).OrderBy(_ => Random.Shared.Next()).ToList();
+            var questions = BuildLocalQuestions(quizId).OrderBy(_ => Random.Shared.Next()).ToList();
             questions = questions.Select((q, i) => q with { Question = q.Question with { DisplayOrder = i + 1 } }).ToList();
             var id = Guid.NewGuid();
             _attempts[id] = new MockAttempt(quizId, questions);
@@ -124,10 +139,17 @@ public sealed class MeridianApiClient
             if (!_attempts.TryGetValue(attemptId, out var attempt))
                 throw new InvalidOperationException("Attempt not found.");
             if (attempt.Result is not null) return attempt.Result;
-            var quiz = GetQuiz(attempt.QuizId);
+            var quiz = GetLocalQuiz(attempt.QuizId);
             var score = (int)Math.Round(attempt.CorrectAnswers * 100m / attempt.Questions.Count);
             var passed = score >= quiz.PassMarkPercent;
             var xp = attempt.CorrectAnswers * 10 + (passed ? 50 : 0);
+            var user = (await _auth.GetAuthenticationStateAsync()).User;
+            var userKey = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(userKey))
+            {
+                _rankingResults.Add(new LocalRankingResult(userKey,
+                    user.Identity.Name ?? "Current user", DateTime.Now, xp, score));
+            }
             attempt.Result = new CompleteAttemptResponse(
                 attemptId, score, passed, attempt.CorrectAnswers, attempt.Questions.Count,
                 xp, passed ? quiz.CpdPoints : 0m);
@@ -143,7 +165,7 @@ public sealed class MeridianApiClient
             }
             else _streak = 0;
 
-            var summary = MockQuizzes.First(x => x.Id == attempt.QuizId);
+            var summary = AllLocalQuizzes().First(x => x.Id == attempt.QuizId);
             _completedQuizzes.RemoveAll(x => x.QuizId == attempt.QuizId);
             _completedQuizzes.Add(new CompletedQuizDto(
                 attempt.QuizId,
@@ -189,14 +211,15 @@ public sealed class MeridianApiClient
         if (_local)
         {
             await Task.Delay(70, ct);
-            return new List<LeaderboardEntryDto>
-            {
-                new(1, "Ayesha Daniels", 860, 9, 96),
-                new(2, "Marc Williams", 720, 8, 94),
-                new(3, "Admin", _totalXp, Math.Max(1, _totalXp / 100 + 1), 90),
-                new(4, "Thabo Nkosi", 210, 3, 84),
-                new(5, "Lerato Mokoena", 170, 2, 80)
-            }.OrderByDescending(x => x.TotalXp).Take(take).Select((x, i) => x with { Rank = i + 1 }).ToList();
+            return _rankingResults
+                .GroupBy(x => x.UserKey)
+                .Select(g => new LeaderboardEntryDto(0, g.Last().DisplayName,
+                    g.Sum(x => x.Xp), Math.Max(1, g.Sum(x => x.Xp) / 100 + 1),
+                    g.Max(x => x.ScorePercent)))
+                .OrderByDescending(x => x.TotalXp)
+                .ThenBy(x => x.DisplayName)
+                .Take(Math.Max(0, take))
+                .Select((x, i) => x with { Rank = i + 1 }).ToList();
         }
         using var response = await _http.GetAsync($"api/leaderboard?take={take}", ct);
         return await ReadAsync<List<LeaderboardEntryDto>>(response, ct);
@@ -214,7 +237,7 @@ public sealed class MeridianApiClient
         {
             await Task.Delay(70, ct);
             EnsureMonthlyXpPeriod();
-            return BuildMockMonthlyLeaderboard(year, month);
+            return BuildLocalMonthlyLeaderboard(year, month);
         }
 
         using var response = await _http.GetAsync(
@@ -224,54 +247,19 @@ public sealed class MeridianApiClient
         return await ReadAsync<List<MonthlyLeaderboardEntryDto>>(response, ct);
     }
 
-    private IReadOnlyList<MonthlyLeaderboardEntryDto> BuildMockMonthlyLeaderboard(int year, int month)
+    private IReadOnlyList<MonthlyLeaderboardEntryDto> BuildLocalMonthlyLeaderboard(int year, int month)
     {
-        if (year == 2026 && month == 8)
-        {
-            var localMonthlyXp =
-                year == _monthlyXpYear && month == _monthlyXpMonth
-                    ? _monthlyXp
-                    : 240;
-
-            return new List<MonthlyLeaderboardEntryDto>
-            {
-                new(1, 1, "Ayesha Daniels", 9, 96m, 860),
-                new(2, 2, "Marc Williams", 8, 94m, 720),
-                new(3, 3, "Local Developer", Math.Max(1, localMonthlyXp / 100 + 1), 90m, localMonthlyXp),
-                new(4, 4, "Thabo Nkosi", 3, 84m, 210),
-                new(5, 5, "Lerato Mokoena", 2, 80m, 170)
-            }
+        return _rankingResults
+            .Where(x => x.CompletedAt.Year == year && x.CompletedAt.Month == month)
+            .GroupBy(x => x.UserKey)
+            // Local users have email identities, not database IDs; 0 is local-only.
+            .Select(g => new MonthlyLeaderboardEntryDto(0, 0, g.Last().DisplayName,
+                Math.Max(1, g.Sum(x => x.Xp) / 100 + 1),
+                g.Max(x => x.ScorePercent), g.Sum(x => x.Xp)))
             .OrderByDescending(x => x.MonthlyXp)
+            .ThenBy(x => x.DisplayName)
             .Take(5)
-            .Select((x, index) => x with { Rank = index + 1 })
-            .ToList();
-        }
-
-        if (year == 2026 && month == 7)
-        {
-            return
-            [
-                new(1, 2, "Marc Williams", 8, 97m, 790),
-                new(2, 1, "Ayesha Daniels", 8, 93m, 710),
-                new(3, 4, "Thabo Nkosi", 3, 88m, 330),
-                new(4, 5, "Lerato Mokoena", 2, 85m, 260),
-                new(5, 3, "Local Developer", 2, 82m, 190)
-            ];
-        }
-
-        if (year == 2026 && month == 6)
-        {
-            return
-            [
-                new(1, 1, "Ayesha Daniels", 8, 95m, 680),
-                new(2, 4, "Thabo Nkosi", 3, 92m, 540),
-                new(3, 2, "Marc Williams", 7, 89m, 470),
-                new(4, 3, "Local Developer", 2, 84m, 220),
-                new(5, 5, "Lerato Mokoena", 2, 78m, 140)
-            ];
-        }
-
-        return [];
+            .Select((x, i) => x with { Rank = i + 1 }).ToList();
     }
 
     private void EnsureMonthlyXpPeriod()

@@ -7,9 +7,7 @@
 <div class="dash-page quiz-details-page">
 
     <div class="dash-topbar">
-        <a class="subtle-link" href="quizzes">
-            ← Quizzes
-        </a>
+        <BrandMark Page="Quizzes" PageHref="quizzes" />
 
         <LoginDisplay />
     </div>
@@ -79,10 +77,22 @@
 
             </div>
 
-            <a class="quiz-start full-action"
-               href="@($"quiz/{_quiz.Id}/take")">
-                Start quiz
-            </a>
+            @if (_quiz.ExpiresAt is DateTime end)
+            {
+                <p class="detail-copy">Expires @QuizAvailability.Display(end)</p>
+            }
+            @if (QuizAvailability.IsExpired(_quiz.ExpiresAt))
+            {
+                <p class="detail-copy" role="status">This quiz has expired. No new attempts can be started.</p>
+            }
+            else if (QuizAvailability.IsUnlocked(_quiz.AvailableFrom))
+            {
+                <a class="quiz-start full-action" href="@($"quiz/{_quiz.Id}/take")">Start quiz</a>
+            }
+            else
+            {
+                <p class="detail-copy" role="status">Unlocks @QuizAvailability.Display(_quiz.AvailableFrom!.Value)</p>
+            }
 
         </section>
     }

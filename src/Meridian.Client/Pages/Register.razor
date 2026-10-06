@@ -403,100 +403,14 @@
 
         try
         {
-            // ---------------------------------------------
-            // Build username from email
-            // ---------------------------------------------
-
-            var userName =
-                CreateUserName(Model.Email);
-
-
-            // ---------------------------------------------
-            // Create request for Meridian.Api
-            // ---------------------------------------------
-
-            var request = new CreateUserRequest
+            await Accounts.RegisterAsync(new Meridian.Shared.DTOs.RegisterAccountRequest
             {
-                UserName = userName,
-
-                Email =
-                    Model.Email.Trim(),
-
-                FirstName =
-                    Model.FirstName.Trim(),
-
-                LastName =
-                    Model.LastName.Trim(),
-
-                Department =
-                    Model.Department.Trim(),
-
-                UserRole =
-                    Model.UserRole.Trim()
-            };
-
-
-            // ---------------------------------------------
-            // REAL DATABASE SAVE
-            //
-            // Meridian.Client
-            //       ↓
-            // POST /api/users
-            //       ↓
-            // Meridian.Api
-            //       ↓
-            // MySQL
-            // ---------------------------------------------
-
-            var createdUser =
-                await UserApi.CreateUserAsync(request);
-
-
-            // ---------------------------------------------
-            // LOCAL DEVELOPMENT LOGIN
-            //
-            // Password and line manager are currently
-            // only used by our temporary local login.
-            // ---------------------------------------------
-
-            var localRegistration =
-                new LocalRegistration(
-                    Model.FirstName,
-                    Model.LastName,
-                    Model.Email,
-                    Model.Department,
-                    Model.LineManager,
-                    Model.Password);
-
-
-            if (!Accounts.TryRegister(
-                    localRegistration,
-                    out var localError))
-            {
-                Error =
-                    $"The user was saved to the database, " +
-                    $"but the local login could not be created. " +
-                    $"{localError}";
-
-                return;
-            }
-
-
-            // ---------------------------------------------
-            // Success
-            // ---------------------------------------------
-
-            Success =
-                $"Account created successfully. " +
-                $"User ID: {createdUser.Id}";
-
-
-            // Small delay so the success message can appear.
-            await Task.Delay(700);
-
-
-            // LocalAccountService has authenticated the user.
-            Navigation.NavigateTo("/");
+                Email = Model.Email.Trim(), Password = Model.Password,
+                FirstName = Model.FirstName.Trim(), LastName = Model.LastName.Trim(),
+                Department = Model.Department.Trim(), JobTitle = Model.UserRole.Trim(),
+                LineManager = Model.LineManager.Trim()
+            });
+            Navigation.NavigateTo("/", forceLoad: true);
         }
         catch (Exception ex)
         {

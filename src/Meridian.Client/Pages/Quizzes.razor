@@ -9,7 +9,7 @@
     <div class="quizzes-content">
 
         <div class="quizzes-topbar">
-            <div class="dash-brand">Quizzes</div>
+            <div class="dash-brand"><BrandMark Page="Quizzes" /></div>
             <LoginDisplay />
         </div>
 
@@ -54,11 +54,15 @@
 
                                 </span>
 
-                                @if (!unlocked &&
+                                @if (quiz.ExpiresAt is DateTime end)
+                                    {
+                                        <span class="quiz-unlock-date">@(QuizAvailability.IsExpired(end) ? "Expired" : "Expires") @QuizAvailability.Display(end)</span>
+                                    }
+                                    @if (!unlocked && !QuizAvailability.IsExpired(quiz.ExpiresAt) &&
                                     quiz.AvailableFrom is DateTime availableFrom)
                                 {
                                     <span class="quiz-unlock-date">
-                                        Unlocks @availableFrom.ToString("dd MMM yyyy")
+                                        Unlocks @QuizAvailability.Display(availableFrom)
                                     </span>
                                 }
 
@@ -74,7 +78,7 @@
                             else
                             {
                                 <span class="quiz-start quiz-locked">
-                                    Locked
+                                    @(QuizAvailability.IsExpired(quiz.ExpiresAt) ? "Expired" : "Locked")
                                 </span>
                             }
 
@@ -171,8 +175,7 @@
 
     private static bool IsUnlocked(QuizSummaryDto quiz)
     {
-        return quiz.AvailableFrom is null ||
-               DateTime.Today >= quiz.AvailableFrom.Value.Date;
+        return QuizAvailability.CanStart(quiz.AvailableFrom, quiz.ExpiresAt);
     }
 
 

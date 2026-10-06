@@ -13,33 +13,21 @@
     <div class="dash-topbar">
 
         <div class="dash-brand"
-             style="display:flex; align-items:center; gap:16px;">
+             style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
 
-            <span>Meridian</span>
+            <BrandMark />
 
-            <button type="button"
-                    @onclick="ExportReportAsync"
-                    disabled="@_exporting"
-                    style="
-                background: var(--orange);
-                color: var(--white);
-                border: none;
-                border-radius: 8px;
-                padding: 8px 16px;
-                font-size: 0.78rem;
-                font-weight: 600;
-                cursor: pointer;">
+            <a href="reports" class="btn-arc btn-arc--primary btn-arc--export">
+                <span>Export report (PDF)</span>
+            </a>
 
-                @if (_exporting)
-                {
-                    <span>Generating...</span>
-                }
-                else
-                {
-                    <span>Export to Excel</span>
-                }
-
-            </button>
+            @if (_canCreateQuizzes)
+            {
+                <a href="quiz-builder" class="btn-arc btn-arc--quiz" title="Create a quiz"><span>+ Quiz</span></a>
+            }
+            <AuthorizeView Policy="QuizAuthor">
+                <a href="surveys" class="btn-arc btn-arc--surveys" title="Create or manage surveys"><span>+ Surveys</span></a>
+            </AuthorizeView>
 
         </div>
 
@@ -204,12 +192,16 @@
                                     </span>
 
 
-                                    @if (!unlocked &&
+                                    @if (quiz.ExpiresAt is DateTime end)
+                                    {
+                                        <span class="quiz-unlock-date">@(QuizAvailability.IsExpired(end) ? "Expired" : "Expires") @QuizAvailability.Display(end)</span>
+                                    }
+                                    @if (!unlocked && !QuizAvailability.IsExpired(quiz.ExpiresAt) &&
                                         quiz.AvailableFrom is DateTime availableFrom)
                                     {
                                         <span class="quiz-unlock-date">
                                             Unlocks
-                                            @availableFrom.ToString("dd MMM yyyy")
+                                            @QuizAvailability.Display(availableFrom)
                                         </span>
                                     }
 
@@ -220,7 +212,7 @@
 
                                     @(unlocked
                                         ? "Unlocked"
-                                        : "Locked")
+                                        : QuizAvailability.IsExpired(quiz.ExpiresAt) ? "Expired" : "Locked")
 
                                 </span>
 
@@ -294,6 +286,10 @@
 
                 </section>
 
+            </div>
+
+            <div class="dash-surveys-col">
+                <DashboardSurveys />
             </div>
 
 
@@ -377,17 +373,10 @@
     private const decimal AnnualCpdTarget = 18m;
 
 
-    private decimal CompletedCpd =>
-        Math.Min(
-            AnnualCpdTarget,
-            _progress is null
-                ? 0
-                : _progress.QuizzesPassed * 1.5m);
+    private decimal CompletedCpd => _completedQuizzes
+        .Where(q => q.CompletedAt.Year == DateTime.UtcNow.Year).Sum(q => q.CpdPointsEarned);
 
-
-    private double Progress =>
-        (double)(CompletedCpd / AnnualCpdTarget);
-
+    private double Progress => (double)Math.Clamp(CompletedCpd / AnnualCpdTarget, 0m, 1m);
 
     private string ArcOffset =>
         (251.33 * (1 - Progress))
@@ -450,6 +439,7 @@
     private IEnumerable<QuizSummaryDto>
         UpcomingQuizzes =>
             _quizzes
+                .Where(quiz => !QuizAvailability.IsExpired(quiz.ExpiresAt))
                 .Where(
                     quiz =>
                         !_completedQuizzes.Any(
@@ -465,33 +455,30 @@
 
     private static bool IsUnlocked(
         QuizSummaryDto quiz) =>
-            quiz.AvailableFrom is null ||
-            DateTime.Today >=
-            quiz.AvailableFrom.Value.Date;
+            QuizAvailability.CanStart(quiz.AvailableFrom, quiz.ExpiresAt);
 
 
     // =============================================
     // Chart
     // =============================================
 
-    private static readonly
-        (string Label, int Height)[] ChartData =
-        [
-            ("Mar", 33),
-            ("Apr", 50),
-            ("May", 17),
-            ("Jun", 67),
-            ("Jul", 50),
-            ("Aug", 33)
-        ];
-
+    private (string Label, int Height)[] ChartData => Enumerable.Range(1, 12)
+        .Select(m => (new DateTime(DateTime.UtcNow.Year, m, 1).ToString("MMM"),
+            Math.Min(100, (int)(_completedQuizzes.Where(q => q.CompletedAt.Year == DateTime.UtcNow.Year && q.CompletedAt.Month == m).Sum(q => q.CpdPointsEarned) * 10))))
+        .ToArray();
 
     // =============================================
     // Load dashboard
     // =============================================
 
+    // Quiz creation is limited to SuperAdmin, HR and line managers (the server enforces it too).
+    private bool _canCreateQuizzes;
+
     protected override async Task OnInitializedAsync()
     {
+        try { _canCreateQuizzes = (await Http.GetFromJsonAsync<ReportAccessDto>("api/reports/access"))?.CanCreateQuizzes == true; }
+        catch { _canCreateQuizzes = false; }
+
         try
         {
             // -----------------------------------------
@@ -523,11 +510,7 @@
                     .GetAuthenticationStateAsync();
 
 
-            var currentUserName =
-                authenticationState
-                    .User
-                    .Identity?
-                    .Name;
+            var currentUserId = authenticationState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
 
             // -----------------------------------------
@@ -549,16 +532,13 @@
             // -----------------------------------------
 
             if (!string.IsNullOrWhiteSpace(
-                    currentUserName))
+                    currentUserId))
             {
                 var currentUser =
                     monthlyLeaderboard
                         .FirstOrDefault(
                             entry =>
-                                string.Equals(
-                                    entry.DisplayName,
-                                    currentUserName,
-                                    StringComparison.OrdinalIgnoreCase));
+                                entry.UserId.ToString() == currentUserId);
 
 
                 _monthlyXp =
@@ -580,57 +560,5 @@
     }
 
 
-    // =============================================
-	// Export Report
-    // =============================================
 
-    private bool _exporting;
-
-    private async Task ExportReportAsync()
-    {
-        try
-        {
-            _exporting = true;
-
-            // Temporary until manager ID comes from
-            // the authenticated user's claims.
-            const long managerId = 3;
-
-            var url =
-                $"api/reports/export" +
-                $"?managerId={managerId}" +
-                $"&cadence=Quarterly";
-
-            using var response =
-                await Http.GetAsync(url);
-
-            response.EnsureSuccessStatusCode();
-
-            var bytes =
-                await response.Content
-                    .ReadAsByteArrayAsync();
-
-            var base64 =
-                Convert.ToBase64String(bytes);
-
-            var fileName =
-                $"Meridian-CPD-Report-Quarterly-" +
-                $"{DateTime.Today:yyyy-MM-dd}.xlsx";
-
-            await JS.InvokeVoidAsync(
-                "meridianDownloadFile",
-                fileName,
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                base64);
-        }
-        catch (Exception ex)
-        {
-            _error =
-                $"Export failed: {ex.Message}";
-        }
-        finally
-        {
-            _exporting = false;
-        }
-    }
 }

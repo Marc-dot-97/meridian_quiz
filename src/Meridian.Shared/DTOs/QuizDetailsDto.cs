@@ -9,4 +9,8 @@ public sealed record QuizDetailsDto(
     int PassMarkPercent,
     int QuestionsPerAttempt,
     decimal CpdPoints,
-    int? TimeLimitMinutes);
+    int? TimeLimitMinutes)
+{
+    public DateTime? AvailableFrom { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+}

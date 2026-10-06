@@ -1,7 +1,6 @@
 @page "/login"
 @attribute [AllowAnonymous]
 @layout AuthLayout
-@inject IConfiguration Configuration
 @inject LocalAccountService Accounts
 @inject NavigationManager Navigation
 
@@ -14,11 +13,8 @@
 
     <div class="login-content auth-panel">
         <h1 class="login-wordmark">Meridian</h1>
-        <p class="login-tagline">Professional development, progress and 
-            CPD learning </p>
+        <p class="login-tagline">Learn, grow and share your voice</p>
 
-        @if (UseLocalMode)
-        {
             <EditForm Model="Model" OnValidSubmit="SignInAsync" class="auth-form">
                 <DataAnnotationsValidator />
                 <label>Work email</label>
@@ -34,49 +30,83 @@
                     <div class="auth-error">@Error</div>
                 }
 
-                <button class="quiz-start auth-submit" type="submit">Sign in</button>
+            <button class="quiz-start auth-submit" type="submit" disabled="@Busy">@(Busy ? "Signing in…" : "Sign in")</button>
             </EditForm>
 
             
             <p class="auth-switch">New to Meridian? <a href="register">Create an account</a></p>
-        }
-        else
-        {
-            <button class="ms-signin-btn" @onclick="MicrosoftLogin">
-                <svg class="ms-logo" viewBox="0 0 21 21" aria-hidden="true">
-                    <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-                    <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-                    <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-                </svg>
-                Sign in with Microsoft
-            </button>
-            <p class="login-note">Uses your Optimum Microsoft account. No separate Meridian password required.</p>
-        }
+
+            @if (DevBypass)
+            {
+                @* DEV BYPASS: only rendered when the API reports it is enabled (never on production). *@
+                <div class="dev-bypass" style="margin-top:20px; padding:12px; border:1px dashed var(--muted-orange); border-radius:8px;">
+                    <div style="font-size:0.7rem; letter-spacing:0.08em; text-transform:uppercase; opacity:0.8; margin-bottom:8px;">Dev bypass · local / dev only</div>
+                    <input class="auth-input" placeholder="Optional: sign in as this email" @bind="DevEmail" autocomplete="off" />
+                    <button class="quiz-start auth-submit" type="button" style="margin-top:8px;" disabled="@Busy" @onclick="DevSignInAsync">
+                        @(string.IsNullOrWhiteSpace(DevEmail) ? "Dev sign-in (Dev Admin)" : "Dev sign-in as user")
+                    </button>
+                    <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                        <button class="quiz-start" type="button" style="flex:1; font-size:0.75rem;" disabled="@Busy" @onclick="() => SeedAsync(false, false)">Seed dummy data</button>
+                        <button class="quiz-start" type="button" style="flex:1; font-size:0.75rem;" disabled="@Busy" @onclick="() => SeedAsync(true, false)">Reset seed</button>
+                        <button class="quiz-start" type="button" style="flex:1; font-size:0.75rem;" disabled="@Busy" @onclick="() => SeedAsync(false, true)">Clear seed</button>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(SeedMessage))
+                    {
+                        <div style="margin-top:8px; font-size:0.75rem; opacity:0.85;">@SeedMessage</div>
+                    }
+                </div>
+            }
     </div>
 
-    <p class="login-footer">OPTIMUM FINANCIAL SERVICES GROUP · MERIDIAN CPD</p>
+    <p class="login-footer">MERIDIAN · PRIMEBRIDGE</p>
 </div>
 
 @code {
-    private bool UseLocalMode => Configuration.GetValue<bool>("Development:UseLocalMode");
     private LoginModel Model { get; } = new();
     private string? Error;
+    private bool Busy;
+    private bool DevBypass;
+    private string? DevEmail;
 
-    private Task SignInAsync()
+    protected override async Task OnInitializedAsync() => DevBypass = await Accounts.DevBypassAvailableAsync();
+
+    private string? SeedMessage;
+
+    private async Task SeedAsync(bool reset, bool clearOnly)
     {
-        if (Accounts.TryLogin(Model.Email, Model.Password, out var error))
-            Navigation.NavigateTo("/");
-        else
-            Error = error;
-        return Task.CompletedTask;
+        if (Busy) return;
+        Busy = true;
+        Error = null;
+        SeedMessage = clearOnly ? "Clearing seed data…" : "Seeding…";
+        try { SeedMessage = await Accounts.SeedAsync(reset, clearOnly); }
+        catch (Exception ex) { SeedMessage = null; Error = ex.Message; }
+        finally { Busy = false; }
     }
 
-    private void MicrosoftLogin() => Navigation.NavigateToLogin("authentication/login");
+    private async Task DevSignInAsync()
+    {
+        if (Busy) return;
+        Busy = true;
+        Error = null;
+        try { await Accounts.DevLoginAsync(DevEmail); Navigation.NavigateTo("/", forceLoad: true); }
+        catch (Exception ex) { Error = ex.Message; }
+        finally { Busy = false; }
+    }
+
+    private async Task SignInAsync()
+    {
+        if (Busy) return;
+        Busy = true;
+        Error = null;
+        try { await Accounts.LoginAsync(Model.Email.Trim(), Model.Password); Navigation.NavigateTo("/", forceLoad: true); }
+        catch (Exception ex) { Error = ex.Message; }
+        finally { Busy = false; }
+    }
+
 
     private sealed class LoginModel
     {
-        [Required, EmailAddress] public string Email { get; set; } = "local@meridian.test";
-        [Required] public string Password { get; set; } = "admin123";
+        [Required, EmailAddress] public string Email { get; set; } = "";
+        [Required] public string Password { get; set; } = "";
     }
 }

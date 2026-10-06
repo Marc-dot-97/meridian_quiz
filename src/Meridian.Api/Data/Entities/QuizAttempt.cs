@@ -5,6 +5,11 @@ namespace Meridian.Api.Data.Entities;
 
 public partial class QuizAttempt
 {
+    public string? QuestionsJson { get; set; }
+    public string? AnswersJson { get; set; }
+    public byte? SnapshotPassMark { get; set; }
+    public decimal? SnapshotCpdPoints { get; set; }
+    public ushort? SnapshotTimeLimitMinutes { get; set; }
     public Guid Id { get; set; }
 
     public ulong UserId { get; set; }

@@ -5,6 +5,7 @@
 <PageTitle>Meridian | Result</PageTitle>
 
 <div class="dash-page results-page">
+    <div class="page-brand-bar"><BrandMark Page="Result" /></div>
 
     @if (_loading)
     {
@@ -57,12 +58,11 @@
 
             </div>
 
-            <a class="quiz-start full-action"
-               href="quizzes">
-                Choose another quiz
-            </a>
+
 
         </section>
+
+        <a class="quiz-start full-action" href="quizzes">Choose another quiz</a>
     }
 
 </div>
@@ -73,6 +73,7 @@
     private string? _error;
     protected override async Task OnParametersSetAsync()
     {
+        _loading = true; _error = null; _result = null;
         try { _result = await Api.GetResultAsync(AttemptId); }
         catch (Exception ex) { _error = ex.Message; }
         finally { _loading = false; }

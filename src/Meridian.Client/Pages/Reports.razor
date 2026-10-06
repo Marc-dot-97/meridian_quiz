@@ -1,0 +1,226 @@
+@page "/reports"
+@attribute [Authorize]
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Meridian | Reports</PageTitle>
+
+<div class="dash-page">
+<div class="quizzes-content">   @* same width as the Quizzes page *@
+    <div class="dash-topbar"><div class="dash-brand"><BrandMark Page="Reports" /></div><LoginDisplay /></div>
+
+    @if (_loading)
+    {
+        <LoadingPanel Message="Loading report options..." />
+    }
+    else if (_access is null)
+    {
+        <ErrorPanel Message="@(_error ?? "Reports are unavailable right now.")" />
+    }
+    else
+    {
+        <section class="encounter-card report-card">
+            <div class="encounter-eyebrow">@RoleLabel</div>
+            <h2 class="report-title">Export PDF report</h2>
+            <p class="detail-copy">@ScopeHelp</p>
+
+            <div class="report-field">
+                <label>Date range</label>
+                <div class="report-quick">
+                    <button type="button" @onclick="() => Quick(QuickRange.Month)">This month</button>
+                    <button type="button" @onclick="() => Quick(QuickRange.Quarter)">This quarter</button>
+                    <button type="button" @onclick="() => Quick(QuickRange.HalfYear)">Last 6 months</button>
+                    <button type="button" @onclick="() => Quick(QuickRange.Year)">This year</button>
+                    <button type="button" @onclick="() => Quick(QuickRange.Twelve)">Last 12 months</button>
+                </div>
+                <div class="report-dates">
+                    <input class="auth-input" type="date" @bind="_from" aria-label="From date" />
+                    <span>to</span>
+                    <input class="auth-input" type="date" @bind="_to" aria-label="To date" />
+                </div>
+            </div>
+
+            @if (_access.CanChooseDepartment)
+            {
+                <div class="report-field">
+                    <label>Department</label>
+                    @if (_access.Role == "LineManager" && _access.Departments.Count == 1)
+                    {
+                        <div class="report-fixed">@_access.Departments[0]</div>
+                        <label class="report-check"><input type="checkbox" @bind="_justMe" /> Only my personal report</label>
+                    }
+                    else
+                    {
+                        <select class="auth-input" @bind="_department">
+                            <option value="all">@(_access.Role == "LineManager" ? "All my departments" : "All departments")</option>
+                            @foreach (var d in _access.Departments)
+                            {
+                                <option value="@d">@d</option>
+                            }
+                            <option value="me">Just me (personal report)</option>
+                        </select>
+                    }
+                </div>
+            }
+
+            <div class="report-field">
+                <label>Include</label>
+                <div class="report-segment">
+                    <button type="button" class="@(_include == "both" ? "active" : "")" @onclick='() => _include = "both"'>Quizzes &amp; surveys</button>
+                    <button type="button" class="@(_include == "quizzes" ? "active" : "")" @onclick='() => _include = "quizzes"'>Quizzes only</button>
+                    <button type="button" class="@(_include == "surveys" ? "active" : "")" @onclick='() => _include = "surveys"'>Surveys only</button>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="auth-error">@_error</div>
+            }
+
+            <button class="quiz-start auth-submit" type="button" disabled="@_busy" @onclick="GenerateAsync">
+                @(_busy ? "Generating PDF…" : "Download PDF report")
+            </button>
+        </section>
+
+        @if (_access.CanImportDirectory)
+        {
+            <section class="encounter-card report-card">
+                <div class="encounter-eyebrow">SuperAdmin</div>
+                <h2 class="report-title">Employee list</h2>
+                <p class="detail-copy">
+                    Line managers and HR are worked out from this list (the Employees sheet of the company workbook).
+                    Upload a new version whenever staff or managers change. It replaces the previous upload.
+                </p>
+                @if (_directory is not null)
+                {
+                    <div class="detail-grid">
+                        <div><span>Employees</span><strong>@_directory.Employees</strong></div>
+                        <div><span>Departments</span><strong>@_directory.Departments</strong></div>
+                        <div><span>Line managers</span><strong>@_directory.LineManagers</strong></div>
+                        <div><span>No email</span><strong>@_directory.WithoutEmail</strong></div>
+                    </div>
+                    <p class="detail-copy">@(_directory.ImportedAt is DateTime at ? $"Last uploaded {at.ToLocalTime():dd MMM yyyy HH:mm}" : "No list uploaded yet.")</p>
+                }
+                <InputFile OnChange="ImportAsync" accept=".xlsx" disabled="@_busy" />
+                @if (_importMessage is not null)
+                {
+                    <p class="detail-copy">@_importMessage</p>
+                }
+                @if (_importWarnings.Count > 0)
+                {
+                    <ul class="report-warnings">
+                        @foreach (var w in _importWarnings) { <li>@w</li> }
+                    </ul>
+                }
+            </section>
+        }
+    }
+</div>
+</div>
+
+@code {
+    private enum QuickRange { Month, Quarter, HalfYear, Year, Twelve }
+
+    private ReportAccessDto? _access;
+    private DirectorySummaryDto? _directory;
+    private bool _loading = true, _busy, _justMe;
+    private string? _error, _importMessage;
+    private List<string> _importWarnings = [];
+    private DateOnly _from, _to;
+    private string _department = "all";
+    private string _include = "both";
+
+    private string RoleLabel => _access?.Role switch
+    {
+        "SuperAdmin" => "SuperAdmin",
+        "HR" => "Human Resources",
+        "LineManager" => "Line manager",
+        _ => "My report"
+    };
+
+    private string ScopeHelp => _access?.Role switch
+    {
+        "SuperAdmin" or "HR" => "Choose one department or all departments, the period, and what to include.",
+        "LineManager" => "Your report covers the staff in the department(s) you manage.",
+        _ => "Your personal CPD report: quiz results and survey responses."
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Quick(QuickRange.Quarter);
+        try
+        {
+            _access = await Http.GetFromJsonAsync<ReportAccessDto>("api/reports/access");
+            if (_access?.CanImportDirectory == true) await LoadDirectoryAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task LoadDirectoryAsync() =>
+        _directory = await Http.GetFromJsonAsync<DirectorySummaryDto>("api/reports/directory");
+
+    private void Quick(QuickRange range)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        _to = today;
+        _from = range switch
+        {
+            QuickRange.Month => new DateOnly(today.Year, today.Month, 1),
+            QuickRange.Quarter => new DateOnly(today.Year, (today.Month - 1) / 3 * 3 + 1, 1),
+            QuickRange.HalfYear => today.AddMonths(-6).AddDays(1),
+            QuickRange.Year => new DateOnly(today.Year, 1, 1),
+            _ => today.AddMonths(-12).AddDays(1)
+        };
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (_busy) return;
+        _error = null;
+        if (_to < _from) { _error = "The end date must be on or after the start date."; return; }
+        _busy = true;
+        try
+        {
+            var department = _access?.CanChooseDepartment != true ? "me"
+                : _access.Role == "LineManager" && _access.Departments.Count == 1 ? (_justMe ? "me" : "all")
+                : _department;
+            var url = $"api/reports/pdf?from={_from:yyyy-MM-dd}&to={_to:yyyy-MM-dd}" +
+                      $"&department={Uri.EscapeDataString(department)}&include={_include}";
+            using var response = await Http.GetAsync(url);
+            if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response);
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? $"Meridian-Report-{_from:yyyyMMdd}-{_to:yyyyMMdd}.pdf";
+            await JS.InvokeVoidAsync("meridianDownloadFile", fileName, "application/pdf", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task ImportAsync(InputFileChangeEventArgs e)
+    {
+        if (_busy) return;
+        _busy = true;
+        _importMessage = "Uploading…";
+        _importWarnings = [];
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var file = new StreamContent(e.File.OpenReadStream(10_000_000));
+            file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            content.Add(file, "file", e.File.Name);
+            using var response = await Http.PostAsync("api/reports/directory", content);
+            if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response);
+            var result = await response.Content.ReadFromJsonAsync<DirectoryImportResultDto>();
+            _importMessage = $"Imported {result?.Imported ?? 0} employees.";
+            _importWarnings = result?.Warnings ?? [];
+            await LoadDirectoryAsync();
+            _access = await Http.GetFromJsonAsync<ReportAccessDto>("api/reports/access");
+        }
+        catch (Exception ex) { _importMessage = null; _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}
