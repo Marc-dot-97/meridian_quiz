@@ -3,15 +3,15 @@ using Meridian.Shared.DTOs;
 namespace Meridian.Client.Services;
 public sealed class LocalAccountService(HttpClient http, LocalAuthenticationStateProvider auth)
 {
-    public async Task LoginAsync(string email, string password)
+    // Microsoft sign-in is a full-page redirect handled by the server (/auth/login); this only asks whether it is configured.
+    public async Task<bool> MicrosoftSignInAvailableAsync()
     {
-        using var response = await http.PostAsJsonAsync("api/account/login", new LoginRequest { Email = email, Password = password });
-        await Accept(response);
-    }
-    public async Task RegisterAsync(RegisterAccountRequest request)
-    {
-        using var response = await http.PostAsJsonAsync("api/account/register", request);
-        await Accept(response);
+        try
+        {
+            var status = await http.GetFromJsonAsync<System.Text.Json.JsonElement>("auth/status");
+            return status.TryGetProperty("microsoft", out var m) && m.GetBoolean();
+        }
+        catch { return true; }   // if the check itself fails, still show the button; the server will say what is wrong
     }
     // DEV BYPASS: the API answers 404 here unless the bypass is enabled on that server.
     public async Task<bool> DevBypassAvailableAsync()

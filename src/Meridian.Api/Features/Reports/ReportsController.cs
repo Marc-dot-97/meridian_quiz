@@ -33,7 +33,7 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
     {
         var (_, scope, _) = await ContextAsync(ct);
         return new ReportAccessDto(scope.Role.ToString(), scope.Departments.ToList(),
-            scope.Role != ReportRole.Staff, scope.Role == ReportRole.SuperAdmin, scope.Role != ReportRole.Staff);
+            scope.Role != ReportRole.Staff, scope.Role == ReportRole.SuperAdmin && !directory.UsesCrm, scope.Role != ReportRole.Staff);
     }
 
     /// <summary>
@@ -301,7 +301,7 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
     {
         var (_, scope, _) = await ContextAsync(ct);
         if (scope.Role != ReportRole.SuperAdmin) return StatusCode(403, new { message = "Only a SuperAdmin can manage the employee list." });
-        var rows = (await directory.GetAllAsync(ct)).Where(e => e.Source == "import").ToList();
+        var rows = (await directory.GetAllAsync(ct)).Where(e => e.Source is "import" or "crm").ToList();
         var managers = rows.SelectMany(e => DirectoryNames.SplitManagers(e.LineManager)).Distinct().Count();
         return new DirectorySummaryDto(rows.Count, rows.Select(e => e.Department).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
             managers, rows.Count(e => e.Email is null), directory.ImportedAt);
@@ -313,6 +313,7 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
     {
         var (me, scope, _) = await ContextAsync(ct);
         if (scope.Role != ReportRole.SuperAdmin) return StatusCode(403, new { message = "Only a SuperAdmin can manage the employee list." });
+        if (directory.UsesCrm) return Conflict(new { message = "Employees now come straight from the CRM, so there is no list to upload. Change them in the CRM (Management > Employees)." });
         if (file is null || file.Length == 0) return BadRequest(new { message = "Choose an .xlsx file." });
         if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)) return BadRequest(new { message = "Upload the employee list as an .xlsx file." });
 

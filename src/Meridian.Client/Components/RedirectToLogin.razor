@@ -3,5 +3,11 @@
 <LoadingPanel Message="Redirecting to sign in..." />
 
 @code {
-    protected override void OnInitialized() => Navigation.NavigateTo("/login");
+    // Remember where the person was heading so Microsoft sign-in can bring them back to it.
+    protected override void OnInitialized()
+    {
+        var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+        var onLoginPage = path.StartsWith("/login", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/register", StringComparison.OrdinalIgnoreCase);
+        Navigation.NavigateTo(onLoginPage || path == "/" ? "/login" : $"/login?returnUrl={Uri.EscapeDataString(path)}");
+    }
 }

@@ -15,26 +15,22 @@
         <h1 class="login-wordmark">Meridian</h1>
         <p class="login-tagline">Learn, grow and share your voice</p>
 
-            <EditForm Model="Model" OnValidSubmit="SignInAsync" class="auth-form">
-                <DataAnnotationsValidator />
-                <label>Work email</label>
-                <InputText class="auth-input" @bind-Value="Model.Email" autocomplete="username" />
-                <ValidationMessage For="() => Model.Email" />
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <div class="auth-error" role="alert">@Message</div>
+            }
 
-                <label>Password</label>
-                <InputText class="auth-input" @bind-Value="Model.Password" type="password" autocomplete="current-password" />
-                <ValidationMessage For="() => Model.Password" />
-
-                @if (!string.IsNullOrWhiteSpace(Error))
-                {
-                    <div class="auth-error">@Error</div>
-                }
-
-            <button class="quiz-start auth-submit" type="submit" disabled="@Busy">@(Busy ? "Signing in…" : "Sign in")</button>
-            </EditForm>
-
-            
-            <p class="auth-switch">New to Meridian? <a href="register">Create an account</a></p>
+            @if (MicrosoftAvailable)
+            {
+                <button class="quiz-start auth-submit" type="button" disabled="@Busy" @onclick="SignInWithMicrosoft">
+                    @(Busy ? "Opening Microsoft…" : "Sign in with Microsoft")
+                </button>
+                <p class="auth-switch">Use your Optimum work account, the same one you use for the CRM.</p>
+            }
+            else
+            {
+                <div class="auth-error" role="alert">Microsoft sign-in is not set up on this server yet.</div>
+            }
 
             @if (DevBypass)
             {
@@ -62,15 +58,36 @@
 </div>
 
 @code {
-    private LoginModel Model { get; } = new();
-    private string? Error;
+    [SupplyParameterFromQuery(Name = "error")] public string? ErrorCode { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+
     private bool Busy;
     private bool DevBypass;
+    private bool MicrosoftAvailable = true;
     private string? DevEmail;
-
-    protected override async Task OnInitializedAsync() => DevBypass = await Accounts.DevBypassAvailableAsync();
-
+    private string? Error;
     private string? SeedMessage;
+
+    private string? Message => Error ?? ErrorCode switch
+    {
+        "noaccess" => "Your Microsoft account is not on the Optimum employee list, or is switched off. If you should have access, ask HR or IT to check your details in the CRM.",
+        "failed" => "Microsoft sign-in did not complete. Please try again.",
+        _ => null,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        DevBypass = await Accounts.DevBypassAvailableAsync();
+        MicrosoftAvailable = await Accounts.MicrosoftSignInAvailableAsync();
+    }
+
+    // Full page load on purpose: /auth/login is a server endpoint that redirects to Microsoft, not a Blazor page.
+    private void SignInWithMicrosoft()
+    {
+        Busy = true;
+        var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "auth/login" : $"auth/login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+        Navigation.NavigateTo(target, forceLoad: true);
+    }
 
     private async Task SeedAsync(bool reset, bool clearOnly)
     {
@@ -91,22 +108,5 @@
         try { await Accounts.DevLoginAsync(DevEmail); Navigation.NavigateTo("/", forceLoad: true); }
         catch (Exception ex) { Error = ex.Message; }
         finally { Busy = false; }
-    }
-
-    private async Task SignInAsync()
-    {
-        if (Busy) return;
-        Busy = true;
-        Error = null;
-        try { await Accounts.LoginAsync(Model.Email.Trim(), Model.Password); Navigation.NavigateTo("/", forceLoad: true); }
-        catch (Exception ex) { Error = ex.Message; }
-        finally { Busy = false; }
-    }
-
-
-    private sealed class LoginModel
-    {
-        [Required, EmailAddress] public string Email { get; set; } = "";
-        [Required] public string Password { get; set; } = "";
     }
 }

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
@@ -51,15 +51,33 @@ public static class DirectoryNames
         Regex.Replace((department ?? "").Trim(), @"^[A-Za-z]{2,6}\s+-\s+", "").Trim();
 }
 
-/// <summary>Stores the employee list in MySQL table employee_directory. Source "import" = uploaded list, "seed" = dev seed.</summary>
-public sealed class EmployeeDirectoryStore(string connectionString)
+/// <summary>
+/// Where the employee list comes from.
+///   Mode "crm"   : read live from the CRM's optimum_admin database (dtbl_employees joined to departments, job titles
+///                  and line manager). Read-only; this is what production uses so Meridian and the CRM always agree.
+///   Mode "local" : Meridian's own employee_directory table (uploaded Excel list or dev seed). Local development only.
+/// </summary>
+public sealed record DirectorySourceOptions(string Mode, string AdminDatabase, string ConnectionString)
 {
+    public bool UsesCrm => string.Equals(Mode, "crm", StringComparison.OrdinalIgnoreCase);
+}
+
+/// <summary>Stores the employee list in MySQL table employee_directory. Source "import" = uploaded list, "seed" = dev seed.
+/// In "crm" mode the list is read from the CRM database instead (see DirectorySourceOptions).</summary>
+public sealed class EmployeeDirectoryStore(string connectionString, DirectorySourceOptions? options = null)
+{
+    private static readonly TimeSpan CrmCacheLifetime = TimeSpan.FromMinutes(10);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IReadOnlyList<DirectoryEmployee>? _cache;
+    private DateTime _cacheLoadedUtc;
     public DateTime? ImportedAt { get; private set; }
+
+    /// <summary>True when the list is the CRM's employee table (read-only, cannot be uploaded or seeded).</summary>
+    public bool UsesCrm => options?.UsesCrm == true;
 
     public async Task EnsureSchemaAsync(CancellationToken ct = default)
     {
+        if (UsesCrm) return;   // nothing of ours to create: the CRM owns the employee tables
         await using var connection = new MySqlConnection(connectionString);
         await connection.OpenAsync(ct);
         await using var command = new MySqlCommand("""
@@ -84,11 +102,18 @@ public sealed class EmployeeDirectoryStore(string connectionString)
 
     public async Task<IReadOnlyList<DirectoryEmployee>> GetAllAsync(CancellationToken ct = default)
     {
-        if (_cache is { } cached) return cached;
+        if (_cache is { } cached && CacheIsFresh()) return cached;
         await _gate.WaitAsync(ct);
         try
         {
-            if (_cache is not null) return _cache;
+            if (_cache is not null && CacheIsFresh()) return _cache;
+            if (UsesCrm)
+            {
+                _cache = await LoadFromCrmAsync(ct);
+                _cacheLoadedUtc = DateTime.UtcNow;
+                ImportedAt = _cacheLoadedUtc;
+                return _cache;
+            }
             var rows = new List<DirectoryEmployee>();
             DateTime? importedAt = null;
             await using var connection = new MySqlConnection(connectionString);
@@ -110,14 +135,55 @@ public sealed class EmployeeDirectoryStore(string connectionString)
             }
             ImportedAt = importedAt;
             _cache = rows;
+            _cacheLoadedUtc = DateTime.UtcNow;
             return rows;
         }
         finally { _gate.Release(); }
     }
 
+    // The local table only changes through ReplaceSourceAsync (which clears the cache), so it never expires on its own.
+    // The CRM's table is edited by other people at any time, so that copy is refreshed every few minutes.
+    private bool CacheIsFresh() => !UsesCrm || DateTime.UtcNow - _cacheLoadedUtc < CrmCacheLifetime;
+
+    /// <summary>Reads active employees from the CRM database. SELECT only; never writes.</summary>
+    private async Task<IReadOnlyList<DirectoryEmployee>> LoadFromCrmAsync(CancellationToken ct)
+    {
+        var db = options!.AdminDatabase;
+        if (!System.Text.RegularExpressions.Regex.IsMatch(db, @"^[A-Za-z0-9_]{1,64}$"))
+            throw new InvalidOperationException("Directory:AdminDatabase must be a plain MySQL database name.");
+        var cs = string.IsNullOrWhiteSpace(options.ConnectionString) ? connectionString : options.ConnectionString;
+        var rows = new List<DirectoryEmployee>();
+        await using var connection = new MySqlConnection(cs);
+        await connection.OpenAsync(ct);
+        await using var command = new MySqlCommand($"""
+            SELECT e.email, e.full_name, e.nick_name, e.surname, e.employee_id,
+                   COALESCE(j.job_title, '')                                  AS job_title,
+                   COALESCE(NULLIF(TRIM(e.line_manager_raw), ''), NULLIF(CONCAT_WS(' ', m.full_name, m.surname), '')) AS line_manager,
+                   d.department_name
+            FROM `{db}`.dtbl_employees e
+            LEFT JOIN `{db}`.itbl_departments d ON d.id = e.primary_department_id
+            LEFT JOIN `{db}`.itbl_jobtitles   j ON j.id = e.primary_job_title_id
+            LEFT JOIN `{db}`.dtbl_employees   m ON m.id = e.line_manager_employee_id
+            WHERE e.active IS NULL OR e.active = 1
+            """, connection);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            string? Opt(int i) => reader.IsDBNull(i) ? null : reader.GetString(i).Trim() is { Length: > 0 } t ? t : null;
+            var department = DirectoryNames.CleanDepartment(Opt(7));
+            if (department.Length == 0) continue;   // no department = cannot be placed in any report
+            var email = Opt(0)?.ToLowerInvariant();
+            if (email is not null && !email.Contains('@')) email = null;
+            rows.Add(new DirectoryEmployee(email, Opt(1) ?? "", Opt(2), Opt(3) ?? "", Opt(4), Opt(5) ?? "", Opt(6), department, "crm"));
+        }
+        return rows;
+    }
+
     /// <summary>Replaces every row of one source in a single transaction.</summary>
     public async Task ReplaceSourceAsync(string source, IReadOnlyCollection<DirectoryEmployee> rows, CancellationToken ct = default)
     {
+        if (UsesCrm)
+            throw new InvalidOperationException("The employee list comes from the CRM and cannot be replaced or seeded here.");
         await using var connection = new MySqlConnection(connectionString);
         await connection.OpenAsync(ct);
         await using var tx = await connection.BeginTransactionAsync(ct);
