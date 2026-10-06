@@ -117,6 +117,7 @@ if (builder.Environment.IsProduction())
 {
     // A production server that cannot sign people in, or that would use the wrong employee list, must not start quietly.
     if (!entraConfigured) throw new InvalidOperationException("Production needs AzureAd:TenantId, ClientId and ClientSecret (set them as environment variables, never in a file).");
+    if (builder.Configuration.GetValue("DevBypass:Enabled", false)) throw new InvalidOperationException("DevBypass:Enabled must be false in Production. Remove it from the server configuration.");
     if (!directoryOptions.UsesCrm) throw new InvalidOperationException("Production must read employees from the CRM: set Directory:Source to \"crm\".");
     if (string.IsNullOrWhiteSpace(keysPath)) throw new InvalidOperationException("Production needs DataProtection:KeysPath (a persistent folder) so sessions survive restarts.");
 }
