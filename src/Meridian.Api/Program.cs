@@ -66,7 +66,7 @@ if (entraConfigured)
         o.ClientSecret = azure["ClientSecret"];
         o.CallbackPath = azure["CallbackPath"] ?? "/signin-oidc";
         o.ResponseType = "code";
-        o.ResponseMode = OpenIdConnectResponseMode.Query;   // a plain GET back from Microsoft (keeps the custom anti-forgery header rule for POSTs intact)
+        o.ResponseMode = "query";   // a plain GET back from Microsoft (keeps the custom anti-forgery header rule for POSTs intact)
         o.SaveTokens = false;
         o.Scope.Clear();
         o.Scope.Add("openid");
