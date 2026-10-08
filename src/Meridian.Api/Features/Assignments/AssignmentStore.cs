@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using MySqlConnector;
 
 namespace Meridian.Api.Features.Assignments;
@@ -122,10 +124,10 @@ public sealed class AssignmentStore(string connectionString)
     /// <summary>Replaces one item's departments and settings in a single transaction.</summary>
     public async Task SaveAsync(ItemAssignment assignment, ulong byUserId, CancellationToken ct = default)
     {
-        var now = DateTime.UtcNow;
         await using var connection = new MySqlConnection(connectionString);
         await connection.OpenAsync(ct);
         await using var tx = await connection.BeginTransactionAsync(ct);
+        var now = DateTime.UtcNow;
         var current = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await using (var command = new MySqlCommand(
             "SELECT department FROM content_assignments WHERE content_type = @kind AND content_id = @id FOR UPDATE", connection, tx))
@@ -183,6 +185,24 @@ public sealed class AssignmentStore(string connectionString)
             await upsert.ExecuteNonQueryAsync(ct);
         }
         await tx.CommitAsync(ct);
+    }
+
+    /// <summary>
+    /// Saves the departments of a BRAND-NEW quiz or survey through EF's own connection, so it runs inside the transaction the caller
+    /// already has open (the quiz/survey and its departments are saved together or not at all). The caller commits.
+    /// </summary>
+    public static async Task SaveNewAsync(DatabaseFacade database, ItemAssignment assignment, ulong byUserId, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var department in assignment.Departments)
+            await database.ExecuteSqlInterpolatedAsync($@"INSERT INTO content_assignments (content_type, content_id, department, assigned_by_user_id, assigned_at)
+                VALUES ({assignment.Kind}, {assignment.Id}, {department}, {byUserId}, {now})", ct);
+        if (assignment.Departments.Count == 0 && !assignment.AssignedOnly && assignment.DueOn is null) return;
+        DateTime? due = assignment.DueOn is DateOnly d ? d.ToDateTime(TimeOnly.MinValue) : null;
+        await database.ExecuteSqlInterpolatedAsync($@"INSERT INTO content_assignment_settings (content_type, content_id, assigned_only, due_on, updated_by_user_id, updated_at)
+            VALUES ({assignment.Kind}, {assignment.Id}, {assignment.AssignedOnly}, {due}, {byUserId}, {now})
+            ON DUPLICATE KEY UPDATE assigned_only = VALUES(assigned_only), due_on = VALUES(due_on),
+              updated_by_user_id = VALUES(updated_by_user_id), updated_at = VALUES(updated_at)", ct);
     }
 
     /// <summary>Start-up tidy: removes assignments of quizzes and surveys that no longer exist (dev seed clear, manual deletes).</summary>

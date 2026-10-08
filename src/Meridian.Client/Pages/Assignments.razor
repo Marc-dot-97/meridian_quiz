@@ -107,7 +107,7 @@
                             @if (editing && _draft is not null)
                             {
                                 <div class="assign-editor">
-                                    <AssignmentPicker Value="_draft" Locked="_locked" Kind="@r.Kind" Noun="@(r.Kind == AssignmentKinds.Quiz ? "quiz" : "survey")" />
+                                    <AssignmentPicker Value="_draft" Locked="_locked" SettingsLocked="_settingsLocked" Kind="@r.Kind" Noun="@(r.Kind == AssignmentKinds.Quiz ? "quiz" : "survey")" />
                                     @if (_saveError is not null) { <p class="assign-error" role="alert">@_saveError</p> }
                                     <div class="assign-editor-actions">
                                         <button type="button" class="assign-link" @onclick="CancelEdit" disabled="@_saving">Cancel</button>
@@ -146,6 +146,7 @@
     private string? _editing;
     private AssignmentRequest? _draft;
     private List<string> _locked = [];
+    private bool _settingsLocked;
     private readonly HashSet<string> _open = [];
 
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(2));
@@ -188,6 +189,8 @@
         _saveError = null; _status = null;
         var mine = Mine(r);
         _locked = r.Departments.Where(d => !mine.Contains(d)).ToList();
+        // Same rule as the server (AssignmentViewer.CanEditSettings): SuperAdmin/HR always, others only when every assigned department is theirs.
+        _settingsLocked = _role is not ("SuperAdmin" or "HR") && _locked.Count > 0;
         _draft = new AssignmentRequest
         {
             Departments = r.Departments.Where(mine.Contains).ToList(),
