@@ -25,9 +25,8 @@
             {
                 <a href="quiz-builder" class="btn-arc btn-arc--quiz" title="Create a quiz"><span>+ Quiz</span></a>
             }
-            <AuthorizeView Policy="QuizAuthor">
-                <a href="surveys" class="btn-arc btn-arc--surveys" title="Create or manage surveys"><span>+ Surveys</span></a>
-            </AuthorizeView>
+            <a href="surveys" class="btn-arc btn-arc--surveys" title="Create or manage surveys"><span>+ Surveys</span></a>
+            <a href="assignments" class="btn-arc btn-arc--assign" title="Who has to do which quiz or survey"><span>Assignments</span></a>
 
         </div>
 
@@ -190,6 +189,8 @@
                                         @quiz.QuestionsPerAttempt questions
 
                                     </span>
+
+                                    <RequiredBadge Required="quiz.Required" DueOn="quiz.DueOn" />
 
 
                                     @if (quiz.ExpiresAt is DateTime end)
@@ -446,7 +447,10 @@
                             completed =>
                                 completed.QuizId ==
                                 quiz.Id))
-                .OrderBy(
+                // Assigned to my department first (earliest due date first), then by unlock date.
+                .OrderByDescending(quiz => quiz.Required)
+                .ThenBy(quiz => quiz.DueOn ?? DateOnly.MaxValue)
+                .ThenBy(
                     quiz =>
                         quiz.AvailableFrom ??
                         DateTime.MinValue)

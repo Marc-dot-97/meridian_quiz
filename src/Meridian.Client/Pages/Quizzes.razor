@@ -26,7 +26,7 @@
             <!-- AVAILABLE MODULES -->
             <section class="block quizzes-block">
 
-                <h2>Available modules</h2>
+                <div class="dashboard-section-link"><h2>Available modules</h2><AuthorizeView Policy="QuizAuthor"><a class="view-all" href="assignments">Assignments →</a></AuthorizeView></div>
 
                 <div class="quiz-list">
 
@@ -53,6 +53,8 @@
                                     @quiz.PassMarkPercent% pass mark
 
                                 </span>
+
+                                <RequiredBadge Required="quiz.Required" DueOn="quiz.DueOn" />
 
                                 @if (quiz.ExpiresAt is DateTime end)
                                     {
@@ -170,7 +172,10 @@
                 quiz =>
                     !_completedQuizzes.Any(
                         completed =>
-                            completed.QuizId == quiz.Id));
+                            completed.QuizId == quiz.Id))
+            // Quizzes assigned to my department first, earliest due date first.
+            .OrderByDescending(quiz => quiz.Required)
+            .ThenBy(quiz => quiz.DueOn ?? DateOnly.MaxValue);
 
 
     private static bool IsUnlocked(QuizSummaryDto quiz)

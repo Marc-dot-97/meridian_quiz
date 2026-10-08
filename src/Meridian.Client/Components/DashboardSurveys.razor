@@ -1,6 +1,6 @@
 @inject SurveyService SurveysApi
 <section class="block dashboard-surveys-block">
-    <div class="dashboard-section-link"><h2>Surveys</h2><AuthorizeView Policy="QuizAuthor"><a class="view-all" href="surveys">Manage surveys →</a></AuthorizeView></div>
+    <div class="dashboard-section-link"><h2>Surveys</h2><a class="view-all" href="surveys">Create or manage surveys →</a></div>
     @if (Loading) { <p class="empty-completed" role="status">Loading surveys...</p> }
     else if (Error is not null) { <div class="empty-completed" role="alert">@Error <button type="button" class="quiz-start" @onclick="LoadAsync">Retry</button></div> }
     else if (!Items.Any(s => s.CompletedAt is null)) { <div class="empty-completed">No surveys waiting to be completed.</div> }
@@ -10,7 +10,7 @@
             @foreach (var survey in Items.Where(s => s.CompletedAt is null))
             {
                 <div class="quiz-card" @key="survey.Id">
-                    <div class="quiz-info"><span class="quiz-title">@survey.Title</span><span class="quiz-meta"><span class="quiz-tag">Survey</span> @survey.QuestionCount questions</span></div>
+                    <div class="quiz-info"><span class="quiz-title">@survey.Title</span><span class="quiz-meta"><span class="quiz-tag">Survey</span> @survey.QuestionCount questions</span><RequiredBadge Required="survey.Required" DueOn="survey.DueOn" /></div>
                     <a class="quiz-start" href="@($"survey/{survey.Id}")">Open</a>
                 </div>
             }

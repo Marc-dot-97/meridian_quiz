@@ -12,7 +12,8 @@ namespace Meridian.Api.Features.Quizzes;
 [Route("api/quizzes")]
 [Authorize]
 public sealed class QuizBuilderController(MeridianDbContext db, ILogger<QuizBuilderController> logger,
-    Meridian.Api.Features.Reports.ReportAccessService access) : ControllerBase
+    Meridian.Api.Features.Reports.ReportAccessService access, Meridian.Api.Features.Assignments.AssignmentService assignments,
+    Meridian.Api.Features.Assignments.AssignmentStore assignmentStore) : ControllerBase
 {
     [HttpPost]
     [RequestSizeLimit(2_000_000)]
@@ -36,6 +37,17 @@ public sealed class QuizBuilderController(MeridianDbContext db, ILogger<QuizBuil
             if (QuizAvailability.IsExpired(request.ExpiresAt)) errors.Add("Expiry must be in the future.");
         }
         if (errors.Count > 0) return BadRequest(new { message = string.Join(" ", errors) });
+
+        // Departments that have to do this quiz: checked before anything is saved.
+        Meridian.Api.Features.Assignments.ItemAssignment? assignment = null;
+        if (request.Assignment is { } wanted && (wanted.Departments.Count > 0 || wanted.AssignedOnly || wanted.DueOn is not null))
+        {
+            var viewer = await assignments.ViewerAsync(User, ct);
+            if (viewer is null) return Forbid();
+            var (prepared, assignmentError) = await assignments.PrepareAsync(viewer, AssignmentKinds.Quiz, null, wanted, ct);
+            if (prepared is null) return BadRequest(new { message = assignmentError });
+            assignment = prepared;
+        }
 
         var title = request.Title.Trim();
         var categoryName = request.Category.Trim();
@@ -88,6 +100,17 @@ public sealed class QuizBuilderController(MeridianDbContext db, ILogger<QuizBuil
             logger.LogError(ex, "Quiz builder could not save the quiz");
             return Problem(statusCode: 500, title: "Quiz could not be saved",
                 detail: "No partial quiz was saved. Check the API log and database schema before retrying.");
+        }
+        if (assignment is not null)
+        {
+            try { await assignmentStore.SaveAsync(assignment with { Id = quiz.Id.ToString() }, quiz.CreatedByUserId ?? 0, ct); }
+            catch (Exception ex)
+            {
+                // The quiz itself is saved; the author can set the departments again on the Assignments page.
+                logger.LogError(ex, "Quiz {QuizId} was saved but its department assignment was not", quiz.Id);
+                return StatusCode(201, new CreatedQuizResponse(quiz.Id, quiz.Title, quiz.AvailableFrom, quiz.ExpiresAt)
+                    { AssignmentWarning = "The quiz was saved, but the departments were not. Set them again on the Assignments page." });
+            }
         }
         return Created($"/api/quizzes/{quiz.Id}", new CreatedQuizResponse(quiz.Id, quiz.Title, quiz.AvailableFrom, quiz.ExpiresAt));
     }

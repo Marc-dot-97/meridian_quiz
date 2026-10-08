@@ -10,6 +10,15 @@ namespace Meridian.Api.Features.Reports;
 public sealed record DirectoryEmployee(string? Email, string FullName, string? NickName, string Surname,
     string? EmployeeId, string JobTitle, string? LineManager, string Department, string Source);
 
+/// <summary>Leavers on the CRM (active = 0): their emails and "first|surname" name keys. Never added back from an uploaded list.</summary>
+public sealed record InactiveEmployees(IReadOnlySet<string> Emails, IReadOnlySet<string> Names)
+{
+    public static readonly InactiveEmployees None = new(new HashSet<string>(), new HashSet<string>());
+}
+
+/// <summary>Uploaded list used as a CRM supplement: rows on the list, CRM emails it filled in, people it added, leavers it skipped.</summary>
+public sealed record SupplementStats(int ListRows, int EmailsFilled, int Added, int LeaversSkipped);
+
 public static class DirectoryNames
 {
     /// <summary>Lower-case, accents removed, punctuation to spaces: "Jooste-Daniëls" → "jooste daniels".</summary>
@@ -78,7 +87,7 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
 
     public async Task EnsureSchemaAsync(CancellationToken ct = default)
     {
-        if (UsesCrm) return;   // nothing of ours to create: the CRM owns the employee tables
+        // Also created in "crm" mode: the uploaded employee list is kept here as a supplement to the CRM (see MergeWithSupplement).
         await using var connection = new MySqlConnection(connectionString);
         await connection.OpenAsync(ct);
         await using var command = new MySqlCommand("""
@@ -110,10 +119,13 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
             if (_cache is not null && CacheIsFresh()) return _cache;
             if (UsesCrm)
             {
-                _cache = await LoadFromCrmAsync(ct);
+                var (crm, inactive) = await LoadFromCrmAsync(ct);
+                var (supplement, supplementAt) = await LoadLocalAsync("import", ct);
+                _cache = MergeWithSupplement(crm, supplement, inactive, out var stats);
+                SupplementStats = stats;
                 _aliases = await LoadAliasesAsync(ct);
                 _cacheLoadedUtc = DateTime.UtcNow;
-                ImportedAt = _cacheLoadedUtc;
+                ImportedAt = supplementAt ?? _cacheLoadedUtc;
                 return _cache;
             }
             var rows = new List<DirectoryEmployee>();
@@ -186,8 +198,94 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
     // The CRM's table is edited by other people at any time, so that copy is refreshed every few minutes.
     private bool CacheIsFresh() => !UsesCrm || DateTime.UtcNow - _cacheLoadedUtc < CrmCacheLifetime;
 
-    /// <summary>Reads active employees from the CRM database. SELECT only; never writes.</summary>
-    private async Task<IReadOnlyList<DirectoryEmployee>> LoadFromCrmAsync(CancellationToken ct)
+    /// <summary>What the uploaded list added to the CRM list at the last refresh ("crm" mode only).</summary>
+    public SupplementStats? SupplementStats { get; private set; }
+
+    /// <summary>Rows of one source from Meridian's own employee_directory table (uploaded list or dev seed).</summary>
+    private async Task<(List<DirectoryEmployee> Rows, DateTime? ImportedAt)> LoadLocalAsync(string? source, CancellationToken ct)
+    {
+        var rows = new List<DirectoryEmployee>();
+        DateTime? importedAt = null;
+        await using var connection = new MySqlConnection(connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = new MySqlCommand(
+            "SELECT email, full_name, nick_name, surname, employee_id, job_title, line_manager, department, source, imported_at FROM employee_directory"
+            + (source is null ? "" : " WHERE source = @source"), connection);
+        if (source is not null) command.Parameters.AddWithValue("@source", source);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            string? Opt(int i) => reader.IsDBNull(i) ? null : reader.GetString(i);
+            var row = new DirectoryEmployee(Opt(0), reader.GetString(1), Opt(2), reader.GetString(3), Opt(4),
+                reader.GetString(5), Opt(6), reader.GetString(7), reader.GetString(8));
+            rows.Add(row);
+            if (row.Source == "import")
+            {
+                var at = reader.GetDateTime(9);
+                if (importedAt is null || at > importedAt) importedAt = at;
+            }
+        }
+        return (rows, importedAt);
+    }
+
+    /// <summary>
+    /// "crm" mode with an uploaded list (Full Company and employees.xlsx): the CRM stays the source of truth, the list only fills gaps.
+    ///  1. A CRM employee without an email gets the email from the list (matched on employee number, else on a unique name + surname).
+    ///  2. Someone on the list who is not on the CRM at all is added (with the list's department, job title and line manager).
+    ///  3. Nobody the CRM marks as inactive (a leaver) is ever added back from the list.
+    /// </summary>
+    public static IReadOnlyList<DirectoryEmployee> MergeWithSupplement(IReadOnlyList<DirectoryEmployee> crm, IReadOnlyList<DirectoryEmployee> list,
+        InactiveEmployees inactive, out SupplementStats stats)
+    {
+        static string NameKey(string? first, string? surname) =>
+            $"{DirectoryNames.Normalize(first)}|{DirectoryNames.Normalize(surname)}";
+        static IEnumerable<string> NameKeys(DirectoryEmployee e) =>
+            new[] { NameKey(e.FullName, e.Surname), NameKey(e.NickName, e.Surname) }.Where(k => !k.StartsWith('|') && !k.EndsWith('|')).Distinct();
+        static string? Id(string? id) => string.IsNullOrWhiteSpace(id) ? null : id.Trim().ToLowerInvariant();
+
+        var byId = list.Where(e => Id(e.EmployeeId) is not null).GroupBy(e => Id(e.EmployeeId)!).Where(g => g.Count() == 1)
+            .ToDictionary(g => g.Key, g => g.Single());
+        var byName = list.SelectMany(e => NameKeys(e).Select(k => (k, e))).GroupBy(x => x.k).Where(g => g.Select(x => x.e).Distinct().Count() == 1)
+            .ToDictionary(g => g.Key, g => g.First().e);
+
+        var used = new HashSet<DirectoryEmployee>(ReferenceEqualityComparer.Instance);
+        var result = new List<DirectoryEmployee>(crm.Count + list.Count);
+        var emailsFilled = 0;
+        foreach (var e in crm)
+        {
+            var match = (Id(e.EmployeeId) is { } id && byId.TryGetValue(id, out var m1) ? m1 : null)
+                ?? (e.Email is not null ? list.FirstOrDefault(x => string.Equals(x.Email, e.Email, StringComparison.OrdinalIgnoreCase)) : null)
+                ?? NameKeys(e).Select(k => byName.GetValueOrDefault(k)).FirstOrDefault(x => x is not null);
+            if (match is not null) used.Add(match);
+            if (e.Email is null && match?.Email is { } email)
+            {
+                result.Add(e with { Email = email.Trim().ToLowerInvariant() });
+                emailsFilled++;
+            }
+            else result.Add(e);
+        }
+
+        var emails = result.Where(e => e.Email is not null).Select(e => e.Email!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var crmNames = crm.SelectMany(NameKeys).ToHashSet();
+        var added = 0; var skippedLeavers = 0;
+        foreach (var e in list)
+        {
+            if (used.Contains(e)) continue;
+            if (e.Email is not null && emails.Contains(e.Email)) continue;                 // already on the CRM under that email
+            if (NameKeys(e).Any(crmNames.Contains) && e.Email is null) continue;          // same person, nothing new to add
+            if ((e.Email is not null && inactive.Emails.Contains(e.Email)) || NameKeys(e).Any(inactive.Names.Contains))
+            { skippedLeavers++; continue; }
+            result.Add(e);
+            if (e.Email is not null) emails.Add(e.Email);
+            added++;
+        }
+        stats = new SupplementStats(list.Count, emailsFilled, added, skippedLeavers);
+        return result;
+
+    }
+
+    /// <summary>Reads active employees from the CRM database, plus the emails/names of inactive ones (leavers). SELECT only; never writes.</summary>
+    private async Task<(IReadOnlyList<DirectoryEmployee> Active, InactiveEmployees Inactive)> LoadFromCrmAsync(CancellationToken ct)
     {
         var db = options!.AdminDatabase;
         if (!System.Text.RegularExpressions.Regex.IsMatch(db, @"^[A-Za-z0-9_]{1,64}$"))
@@ -217,14 +315,34 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
             if (email is not null && !email.Contains('@')) email = null;
             rows.Add(new DirectoryEmployee(email, Opt(1) ?? "", Opt(2), Opt(3) ?? "", Opt(4), Opt(5) ?? "", Opt(6), department, "crm"));
         }
-        return rows;
+        await reader.DisposeAsync();
+
+        var inactiveEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var inactiveNames = new HashSet<string>();
+        await using (var leavers = new MySqlCommand(
+            $"SELECT e.email, e.full_name, e.nick_name, e.surname FROM `{db}`.dtbl_employees e WHERE e.active = 0", connection))
+        {
+            await using var r = await leavers.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                string? Opt(int i) => r.IsDBNull(i) ? null : r.GetString(i).Trim() is { Length: > 0 } t ? t : null;
+                if (Opt(0) is { } email && email.Contains('@')) inactiveEmails.Add(email.ToLowerInvariant());
+                var surname = DirectoryNames.Normalize(Opt(3));
+                foreach (var first in new[] { Opt(1), Opt(2) }.Select(DirectoryNames.Normalize).Where(x => x.Length > 0))
+                    if (surname.Length > 0) inactiveNames.Add($"{first}|{surname}");
+            }
+        }
+        // Active employees win over an inactive row with the same name (rehires, duplicates).
+        foreach (var e in rows) { inactiveNames.Remove($"{DirectoryNames.Normalize(e.FullName)}|{DirectoryNames.Normalize(e.Surname)}"); if (e.Email is not null) inactiveEmails.Remove(e.Email); }
+        return (rows, new InactiveEmployees(inactiveEmails, inactiveNames));
     }
 
-    /// <summary>Replaces every row of one source in a single transaction.</summary>
+    /// <summary>Replaces every row of one source in a single transaction.
+    /// In "crm" mode only the uploaded list ("import", used as a supplement) can be replaced; dev seed rows cannot be added.</summary>
     public async Task ReplaceSourceAsync(string source, IReadOnlyCollection<DirectoryEmployee> rows, CancellationToken ct = default)
     {
-        if (UsesCrm)
-            throw new InvalidOperationException("The employee list comes from the CRM and cannot be replaced or seeded here.");
+        if (UsesCrm && source != "import" && rows.Count > 0)
+            throw new InvalidOperationException("The employee list comes from the CRM and cannot be seeded here.");
         await using var connection = new MySqlConnection(connectionString);
         await connection.OpenAsync(ct);
         await using var tx = await connection.BeginTransactionAsync(ct);

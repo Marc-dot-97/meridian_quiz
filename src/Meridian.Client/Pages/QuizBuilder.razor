@@ -34,11 +34,44 @@
             <span class="builder-eyebrow">QUIZ SAVED</span><h2>@Saved.Title</h2>
             <p>@(Saved.AvailableFrom is DateTime date ? $"Available from {QuizAvailability.Display(date)}." : "Available immediately.")</p>
             <p>@(Saved.ExpiresAt is DateTime end ? $"Expires {QuizAvailability.Display(end)}." : "No expiry date.")</p>
-            <div class="builder-actions"><a class="builder-primary" href="quizzes">View quizzes</a><button type="button" class="builder-secondary" @onclick="NewQuiz">Create another quiz</button></div>
+            <p>@(SavedDepartments.Count == 0 ? "Open to everyone; nobody is required to do it." : $"Required for: {string.Join(", ", SavedDepartments)}.")</p>
+            @if (Saved.AssignmentWarning is { } warning) { <p class="builder-errors" role="alert">@warning</p> }
+            <div class="builder-actions"><a class="builder-primary" href="quizzes">View quizzes</a><a class="builder-secondary" href="assignments">Assignments</a><button type="button" class="builder-secondary" @onclick="NewQuiz">Create another quiz</button></div>
         </section>
     }
     else
     {
+        <section class="builder-card builder-import">
+            <span class="builder-eyebrow">IMPORT FROM EXCEL</span>
+            <h2>Already have your questions in Excel?</h2>
+            <p class="builder-hint">Download the Meridian template, fill it in, then import it here. Meridian fills in this quiz for you to check, choose who has to do it, and save. Nothing is saved until you click Save quiz.</p>
+            @if (UseLocalMode)
+            {
+                <p class="builder-hint">Importing needs the Meridian server; it is not available in the local demo.</p>
+            }
+            <div class="builder-actions">
+                <label class="builder-primary builder-upload @(Importing || UseLocalMode ? "is-busy" : "")">
+                    @(Importing ? "Reading file…" : "Import from Excel")
+                    <InputFile accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" OnChange="ImportAsync" disabled="@(Importing || Saving || UseLocalMode)" @key="ImportKey" />
+                </label>
+                <a class="builder-secondary" href="templates/Meridian-Quiz-Import-Template.xlsx" download="Meridian-Quiz-Import-Template.xlsx">Download template</a>
+            </div>
+            @if (ImportMessage is not null)
+            {
+                <p class="builder-import-ok" role="status">@ImportMessage</p>
+            }
+            @foreach (var warning in ImportWarnings)
+            {
+                <p class="builder-hint" role="status">⚠ @warning</p>
+            }
+            @if (ImportProblems.Count > 0 || ImportError is not null)
+            {
+                <div class="builder-errors" role="alert">
+                    <strong>@(ImportError ?? "Please fix these cells in the Excel file and import it again. Nothing was changed.")</strong>
+                    @if (ImportProblems.Count > 0) { <ul>@foreach (var problem in ImportProblems) { <li>@problem</li> }</ul> }
+                </div>
+            }
+        </section>
         <EditForm Model="Model" OnSubmit="SaveAsync">
             <fieldset class="builder-fieldset" disabled="@Saving">
                 <section class="builder-card builder-title-card">
@@ -102,6 +135,10 @@
                     }
                 </section>
                 <section class="builder-card">
+                    <span class="builder-eyebrow">ASSIGN</span><h2>Who has to do this quiz?</h2>
+                    <AssignmentPicker Value="Model.Assignment!" Noun="quiz" Kind="@AssignmentKinds.Quiz" />
+                </section>
+                <section class="builder-card">
                     <label class="retention-choice"><InputCheckbox @bind-Value="Model.AddToArchive" /><span>Add to archive</span></label>
                     <p class="builder-hint">When ticked, this quiz, its questions and all attempts/results will be permanently deleted 24 months after creation. This is not a recoverable archive. Untick to keep it. Any expiry date still applies separately.</p>
                 </section>
@@ -116,9 +153,10 @@
 </div>
 
 @code {
-    private CreateQuizRequest Model = new() { Questions = [new()] };
+    private CreateQuizRequest Model = new() { Questions = [new()], Assignment = new() };
     private List<string> Errors = [];
     private CreatedQuizResponse? Saved;
+    private List<string> SavedDepartments = [];
     private bool Saving;
     private string Schedule = "now";
     private string ExpiryMode = "none";
@@ -162,19 +200,78 @@
             ? new DateTimeOffset(DateTime.SpecifyKind(end, DateTimeKind.Unspecified), TimeSpan.FromHours(2)).UtcDateTime
             : null;
         Errors = QuizBuilderValidation.Validate(Model);
+        Errors.AddRange(AssignmentValidation.Validate(Model.Assignment));
         if (ExpiryMode == "scheduled" && (Model.ExpiresAt is null || Model.ExpiresAt <= DateTime.UtcNow))
             Errors.Add("Choose an expiry date and time in the future, or select No expiry date.");
         if (Schedule == "scheduled" && (Model.AvailableFrom is null || Model.AvailableFrom <= DateTime.UtcNow))
             Errors.Add("Choose an unlock date and time in the future, or select Available immediately.");
         if (Errors.Count > 0) return;
         Saving = true;
-        try { Saved = await Api.CreateQuizAsync(Model); }
+        try { Saved = await Api.CreateQuizAsync(Model); SavedDepartments = [.. Model.Assignment?.Departments ?? []]; }
         catch (Exception ex) { Errors = ["Quiz could not be saved. " + ex.Message]; }
         finally { Saving = false; }
     }
+    // ---- Import from Excel (Main Quest 2) ----
+    private const long MaxImportBytes = 5 * 1024 * 1024;
+    private bool Importing;
+    private int ImportKey;
+    private string? ImportMessage, ImportError;
+    private List<string> ImportProblems = [], ImportWarnings = [];
+
+    private async Task ImportAsync(InputFileChangeEventArgs e)
+    {
+        if (Importing || Saving) return;
+        ImportMessage = null; ImportError = null; ImportProblems = []; ImportWarnings = [];
+        var file = e.File;
+        if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        { ImportError = "Choose the filled-in template as an Excel Workbook (.xlsx)."; ImportKey++; return; }
+        if (file.Size > MaxImportBytes)
+        { ImportError = "The file is larger than 5 MB. Remove pictures or extra sheets and try again."; ImportKey++; return; }
+        Importing = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var buffer = new MemoryStream();
+            await using (var source = file.OpenReadStream(MaxImportBytes)) await source.CopyToAsync(buffer);
+            buffer.Position = 0;
+            var stream = new StreamContent(buffer);
+            stream.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            content.Add(stream, "file", file.Name);
+            using var response = await Http.PostAsync("api/quizzes/import", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                QuizImportProblemDto? problem = null;
+                try { problem = await response.Content.ReadFromJsonAsync<QuizImportProblemDto>(); } catch { }
+                ImportError = problem?.Message ?? "The file could not be imported. Please try again.";
+                ImportProblems = problem?.Problems ?? [];
+                if (ImportProblems.Count > 0 && problem?.Message is { } m && m.StartsWith("Please fix")) ImportError = null;
+                return;
+            }
+            var result = await response.Content.ReadFromJsonAsync<QuizImportResultDto>();
+            if (result?.Quiz is null) { ImportError = "The file could not be imported. Please try again."; return; }
+            ApplyImported(result.Quiz);
+            ImportWarnings = result.Warnings;
+            ImportMessage = $"Imported {result.Quiz.Questions.Count} question{(result.Quiz.Questions.Count == 1 ? "" : "s")} from {result.FileName}. Check them below, choose who has to do it, then click Save quiz.";
+        }
+        catch (Exception ex) { ImportError = "The file could not be imported. " + ex.Message; }
+        finally { Importing = false; ImportKey++; }
+    }
+
+    /// <summary>Puts an imported quiz into the editor; departments already chosen on this page are kept.</summary>
+    private void ApplyImported(CreateQuizRequest imported)
+    {
+        imported.Assignment = Model.Assignment ?? new();
+        Model = imported;
+        Errors = [];
+        Schedule = imported.AvailableFrom is DateTime from ? "scheduled" : "now";
+        if (imported.AvailableFrom is DateTime unlock) UnlockLocal = unlock.AddHours(2);
+        ExpiryMode = imported.ExpiresAt is DateTime ? "scheduled" : "none";
+        if (imported.ExpiresAt is DateTime end) ExpiryLocal = end.AddHours(2);
+    }
+
     private void NewQuiz()
     {
-        Model = new() { Questions = [new()] };
+        Model = new() { Questions = [new()], Assignment = new() };
         Saved = null; Errors = []; Schedule = "now"; ExpiryMode = "none";
         ExpiryLocal = DateTime.UtcNow.AddDays(7).AddHours(2);
         UnlockLocal = DateTime.UtcNow.AddHours(3);

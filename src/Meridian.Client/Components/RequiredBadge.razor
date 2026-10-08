@@ -1,0 +1,13 @@
+@* "Required · due 15 Oct" on quizzes and surveys assigned to the user's department (Main Quest 1). *@
+@if (Required)
+{
+    <span class="required-badge @(Late ? "is-late" : "")">
+        Required@(DueOn is DateOnly due ? (Late ? $" · overdue since {due:dd MMM}" : $" · due {due:dd MMM}") : "")
+    </span>
+}
+
+@code {
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public DateOnly? DueOn { get; set; }
+    private bool Late => DueOn is DateOnly due && due < DateOnly.FromDateTime(DateTime.UtcNow.AddHours(2));
+}
