@@ -122,10 +122,20 @@ public sealed class AssignmentStore(string connectionString)
     /// <summary>Replaces one item's departments and settings in a single transaction.</summary>
     public async Task SaveAsync(ItemAssignment assignment, ulong byUserId, CancellationToken ct = default)
     {
-        var now = DateTime.UtcNow;
         await using var connection = new MySqlConnection(connectionString);
         await connection.OpenAsync(ct);
         await using var tx = await connection.BeginTransactionAsync(ct);
+        await SaveAsync(assignment, byUserId, connection, tx, ct);
+        await tx.CommitAsync(ct);
+    }
+
+    /// <summary>
+    /// The same save inside a connection and transaction the caller owns, so a new quiz or survey and its departments
+    /// are saved together or not at all. The caller commits.
+    /// </summary>
+    public async Task SaveAsync(ItemAssignment assignment, ulong byUserId, MySqlConnection connection, MySqlTransaction tx, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
         var current = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await using (var command = new MySqlCommand(
             "SELECT department FROM content_assignments WHERE content_type = @kind AND content_id = @id FOR UPDATE", connection, tx))
@@ -182,7 +192,6 @@ public sealed class AssignmentStore(string connectionString)
             upsert.Parameters.AddWithValue("@at", now);
             await upsert.ExecuteNonQueryAsync(ct);
         }
-        await tx.CommitAsync(ct);
     }
 
     /// <summary>Start-up tidy: removes assignments of quizzes and surveys that no longer exist (dev seed clear, manual deletes).</summary>

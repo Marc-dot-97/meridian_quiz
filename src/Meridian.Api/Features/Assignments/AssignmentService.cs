@@ -112,11 +112,17 @@ public sealed class AssignmentService(MeridianDbContext db, EmployeeDirectorySto
         requested.UnionWith(currentSet.Where(d => !mine.Contains(d)));
         requested.RemoveWhere(d => !mine.Contains(d) && !currentSet.Contains(d));
 
-        var settingsChanged = request.AssignedOnly != current.AssignedOnly || request.DueOn != current.DueOn;
+        // Staff can create surveys, but only for their own department(s): a survey a staff member creates is never open to the whole company.
+        var staffSurvey = kind == AssignmentKinds.Survey && !viewer.IsAuthor;
+        var assignedOnly = staffSurvey || request.AssignedOnly;
+        if (staffSurvey && requested.Count == 0)
+            return (null, "Choose at least one of your departments. A survey you create is only shown to the departments you pick.");
+
+        var settingsChanged = assignedOnly != current.AssignedOnly || request.DueOn != current.DueOn;
         if (settingsChanged && !viewer.CanEditSettings(kind, current))
             return (null, "Another department's manager set who can see this and the due date; ask them, HR or an administrator to change it.");
 
-        var final = new ItemAssignment(kind, id ?? "", requested.OrderBy(d => d).ToList(), request.AssignedOnly, request.DueOn);
+        var final = new ItemAssignment(kind, id ?? "", requested.OrderBy(d => d).ToList(), assignedOnly, request.DueOn);
         if (final.AssignedOnly && final.Departments.Count == 0)
             return (null, "Choose at least one department when only assigned departments may see it.");
         return (final, null);

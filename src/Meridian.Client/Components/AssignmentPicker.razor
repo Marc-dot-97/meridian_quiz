@@ -54,6 +54,10 @@
                 }
             </div>
         }
+        @if (SettingsLocked)
+        {
+            <p class="assign-note">Who can see this and the due date were set by HR or another manager. Ask them, HR or an administrator to change them.</p>
+        }
         @if (Locked is { Count: > 0 })
         {
             <p class="assign-note">
@@ -63,19 +67,19 @@
         }
         <div class="assign-options">
             <label class="assign-check">
-                <input type="checkbox" checked="@Value.AssignedOnly" disabled="@(SelectedCount == 0)"
+                <input type="checkbox" checked="@Value.AssignedOnly" disabled="@(SelectedCount == 0 || SettingsLocked || _staffSurvey)"
                        @onchange="e => { Value.AssignedOnly = e.Value is true; Changed(); }" />
-                <span>Only these departments can see this @Noun</span>
+                <span>Only these departments can see this @Noun@(_staffSurvey ? " (always on for surveys you create)" : "")</span>
             </label>
             <div class="assign-due">
                 <label for="@($"assign-due-{_uid}")">Due date <span>(optional)</span></label>
                 <input id="@($"assign-due-{_uid}")" type="date" min="@DateTime.UtcNow.AddHours(2).ToString("yyyy-MM-dd")"
-                       disabled="@(SelectedCount == 0)" @bind="Value.DueOn" @bind:after="Changed" />
+                       disabled="@(SelectedCount == 0 || SettingsLocked)" @bind="Value.DueOn" @bind:after="Changed" />
             </div>
         </div>
         <p class="assign-summary" role="status">
             @(SelectedCount == 0
-                ? $"Open to everyone · nobody required"
+                ? (_staffSurvey ? "Choose at least one of your departments" : $"Open to everyone · nobody required")
                 : $"{SelectedCount} department{(SelectedCount == 1 ? "" : "s")} required" +
                   (Value.AssignedOnly ? " · hidden from everyone else" : " · others may take it optionally") +
                   (Value.DueOn is DateOnly due ? $" · due {due:dd MMM yyyy}" : ""))
@@ -92,6 +96,8 @@
     [Parameter] public string Kind { get; set; } = AssignmentKinds.Quiz;
     /// <summary>Departments already assigned by someone else that this author may not change (shown read-only).</summary>
     [Parameter] public IReadOnlyCollection<string>? Locked { get; set; }
+    /// <summary>True when the signed-in person may not change "only these departments" or the due date (set by someone with wider rights).</summary>
+    [Parameter] public bool SettingsLocked { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
     private readonly string _uid = Guid.NewGuid().ToString("N")[..8];
@@ -99,6 +105,7 @@
     private bool _loading = true;
     private string? _error;
     private string _filter = "";
+    private bool _staffSurvey;
 
     private IEnumerable<string> Shown => string.IsNullOrWhiteSpace(_filter)
         ? _departments
@@ -115,6 +122,9 @@
         {
             var result = await Http.GetFromJsonAsync<AssignableDepartmentsDto>($"api/assignments/departments?kind={Kind}");
             _departments = result?.Departments ?? [];
+            // Staff can create surveys for their own department(s) only; such a survey is never open to the whole company.
+            _staffSurvey = Kind == AssignmentKinds.Survey && result?.Role == "Staff";
+            if (_staffSurvey) Value.AssignedOnly = true;
         }
         catch (Exception ex) { _error = "Departments could not be loaded. " + ex.Message; }
         finally { _loading = false; }
@@ -139,7 +149,8 @@
 
     private void Changed()
     {
-        if (SelectedCount == 0) { Value.AssignedOnly = false; Value.DueOn = null; }
+        if (SelectedCount == 0) { Value.AssignedOnly = _staffSurvey; Value.DueOn = null; }
+        else if (_staffSurvey) Value.AssignedOnly = true;
         _ = OnChanged.InvokeAsync();
     }
 }

@@ -4,6 +4,7 @@ using Meridian.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Meridian.Api.Features.Surveys;
 
@@ -29,7 +30,7 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
             DateTime.SpecifyKind(x.CreatedAt, DateTimeKind.Utc), counts.GetValueOrDefault(x.Id))).ToList();
     }
 
-    /// <summary>Everyone can create surveys (staff included); quizzes stay with SuperAdmin, HR and line managers.</summary>
+    /// <summary>Everyone can create surveys (staff included, for their own departments only); quizzes stay with SuperAdmin, HR and line managers.</summary>
     [HttpPost]
     [RequestSizeLimit(1_000_000)]
     public async Task<ActionResult<SurveyDto>> Create(CreateSurveyRequest request, CancellationToken ct)
@@ -38,27 +39,36 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
         if (creatorId is null) return Forbid();
         var errors = SurveyValidation.Definition(request);
         if (errors.Count > 0) return BadRequest(new { message = string.Join(" ", errors) });
+        var viewer = await assignments.ViewerAsync(User, ct);
+        if (viewer is null) return Forbid();
+        // Staff surveys are always assigned to the staff member's own department(s) and hidden from everyone else
+        // (AssignmentService.PrepareAsync enforces this); authors may still leave a survey open to everyone.
+        var wanted = request.Assignment ?? new AssignmentRequest();
         Meridian.Api.Features.Assignments.ItemAssignment? assignment = null;
-        Meridian.Api.Features.Assignments.AssignmentViewer? viewer = null;
-        if (request.Assignment is { } wanted && (wanted.Departments.Count > 0 || wanted.AssignedOnly || wanted.DueOn is not null))
+        if (!viewer.IsAuthor || wanted.Departments.Count > 0 || wanted.AssignedOnly || wanted.DueOn is not null)
         {
-            viewer = await assignments.ViewerAsync(User, ct);
-            if (viewer is null) return Forbid();
             var (prepared, assignmentError) = await assignments.PrepareAsync(viewer, AssignmentKinds.Survey, null, wanted, ct);
             if (prepared is null) return BadRequest(new { message = assignmentError });
             assignment = prepared;
         }
         var survey = new SurveyDto(Guid.NewGuid(), request.Title.Trim(), request.Description?.Trim() ?? "", request.Questions, DateTime.UtcNow);
-        db.Surveys.Add(new SurveyRecord { Id = survey.Id, Title = survey.Title, DefinitionJson = JsonSerializer.Serialize(survey), CreatedAt = survey.CreatedAt, CreatedByUserId = creatorId, DeleteAfter = request.AddToArchive ? survey.CreatedAt.AddMonths(24) : null });
-        await db.SaveChangesAsync(ct);
-        if (assignment is not null && viewer is not null)
+        try
         {
-            try { await assignmentStore.SaveAsync(assignment with { Id = survey.Id.ToString() }, viewer.User.Id, ct); }
-            catch (Exception ex)
-            {
-                // The survey itself is saved; the departments can be set again on the Assignments page.
-                logger.LogError(ex, "Survey {SurveyId} was saved but its department assignment was not", survey.Id);
-            }
+            // Failsafe: the survey and its departments are saved in ONE transaction. If the departments cannot be saved,
+            // the survey is not saved either, so a survey meant to be restricted is never left visible to everyone.
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            db.Surveys.Add(new SurveyRecord { Id = survey.Id, Title = survey.Title, DefinitionJson = JsonSerializer.Serialize(survey), CreatedAt = survey.CreatedAt, CreatedByUserId = creatorId, DeleteAfter = request.AddToArchive ? survey.CreatedAt.AddMonths(24) : null });
+            await db.SaveChangesAsync(ct);
+            if (assignment is not null)
+                await assignmentStore.SaveAsync(assignment with { Id = survey.Id.ToString() }, viewer.User.Id,
+                    (MySqlConnector.MySqlConnection)db.Database.GetDbConnection(), (MySqlConnector.MySqlTransaction)transaction.GetDbTransaction(), ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (Exception ex) when (ex is DbUpdateException or MySqlConnector.MySqlException)
+        {
+            logger.LogError(ex, "Survey {SurveyId} could not be saved with its departments", survey.Id);
+            return Problem(statusCode: 500, title: "Survey could not be saved",
+                detail: "Nothing was saved (the survey and its departments are saved together). Please try again.");
         }
         return StatusCode(201, survey);
     }

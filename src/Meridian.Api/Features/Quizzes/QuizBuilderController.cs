@@ -5,6 +5,7 @@ using Meridian.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Meridian.Api.Features.Quizzes;
 
@@ -93,24 +94,18 @@ public sealed class QuizBuilderController(MeridianDbContext db, ILogger<QuizBuil
         {
             // EF saves the complete quiz/category/question/option graph in one transaction.
             await db.SaveChangesAsync(ct);
+            // Failsafe: the departments (and "only these departments") are saved in the SAME transaction as the quiz.
+            // If they cannot be saved the whole quiz is rolled back, so a quiz meant to be restricted is never saved open to everyone.
+            if (assignment is not null)
+                await assignmentStore.SaveAsync(assignment with { Id = quiz.Id.ToString() }, quiz.CreatedByUserId ?? 0,
+                    (MySqlConnector.MySqlConnection)db.Database.GetDbConnection(), (MySqlConnector.MySqlTransaction)transaction.GetDbTransaction(), ct);
             await transaction.CommitAsync(ct);
         }
-        catch (DbUpdateException ex)
+        catch (Exception ex) when (ex is DbUpdateException or MySqlConnector.MySqlException)
         {
             logger.LogError(ex, "Quiz builder could not save the quiz");
             return Problem(statusCode: 500, title: "Quiz could not be saved",
-                detail: "No partial quiz was saved. Check the API log and database schema before retrying.");
-        }
-        if (assignment is not null)
-        {
-            try { await assignmentStore.SaveAsync(assignment with { Id = quiz.Id.ToString() }, quiz.CreatedByUserId ?? 0, ct); }
-            catch (Exception ex)
-            {
-                // The quiz itself is saved; the author can set the departments again on the Assignments page.
-                logger.LogError(ex, "Quiz {QuizId} was saved but its department assignment was not", quiz.Id);
-                return StatusCode(201, new CreatedQuizResponse(quiz.Id, quiz.Title, quiz.AvailableFrom, quiz.ExpiresAt)
-                    { AssignmentWarning = "The quiz was saved, but the departments were not. Set them again on the Assignments page." });
-            }
+                detail: "Nothing was saved (the quiz and its departments are saved together). Check the API log and database schema before retrying.");
         }
         return Created($"/api/quizzes/{quiz.Id}", new CreatedQuizResponse(quiz.Id, quiz.Title, quiz.AvailableFrom, quiz.ExpiresAt));
     }
