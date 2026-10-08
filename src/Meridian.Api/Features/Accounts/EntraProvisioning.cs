@@ -48,6 +48,18 @@ public static class EntraProvisioning
             employee = entries.FirstOrDefault(e => string.Equals(e.Email, candidate, StringComparison.OrdinalIgnoreCase));
             if (employee is not null) { email = candidate; break; }
         }
+        if (employee is null)
+        {
+            // "Either email can log in": an extra email on the CRM's dtbl_employee_emails resolves to the person's primary
+            // email, and everything after this (the Meridian user row, roles, reports) uses that primary email.
+            var aliases = await directory.GetAliasesAsync(ct);
+            foreach (var candidate in candidates)
+            {
+                if (!aliases.TryGetValue(candidate, out var primary)) continue;
+                employee = entries.FirstOrDefault(e => string.Equals(e.Email, primary, StringComparison.OrdinalIgnoreCase));
+                if (employee is not null) { email = primary; break; }
+            }
+        }
         if (employee is null || email is null)
         {
             // The address is logged for the administrator; it is never put in a URL or shown to other people.

@@ -69,6 +69,7 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
     private static readonly TimeSpan CrmCacheLifetime = TimeSpan.FromMinutes(10);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IReadOnlyList<DirectoryEmployee>? _cache;
+    private IReadOnlyDictionary<string, string> _aliases = new Dictionary<string, string>();
     private DateTime _cacheLoadedUtc;
     public DateTime? ImportedAt { get; private set; }
 
@@ -110,6 +111,7 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
             if (UsesCrm)
             {
                 _cache = await LoadFromCrmAsync(ct);
+                _aliases = await LoadAliasesAsync(ct);
                 _cacheLoadedUtc = DateTime.UtcNow;
                 ImportedAt = _cacheLoadedUtc;
                 return _cache;
@@ -139,6 +141,45 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
             return rows;
         }
         finally { _gate.Release(); }
+    }
+
+    /// <summary>
+    /// Extra sign-in emails ("either email can log in"): maps each extra email to the person's primary email on
+    /// dtbl_employees. Empty outside "crm" mode. Refreshed together with the employee list.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, string>> GetAliasesAsync(CancellationToken ct = default)
+    {
+        await GetAllAsync(ct);
+        return _aliases;
+    }
+
+    /// <summary>Reads dtbl_employee_emails. SELECT only. If the table (or the SELECT right on it) is missing, returns none
+    /// so sign-in with the primary email keeps working.</summary>
+    private async Task<IReadOnlyDictionary<string, string>> LoadAliasesAsync(CancellationToken ct)
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var db = options!.AdminDatabase;
+            var cs = string.IsNullOrWhiteSpace(options.ConnectionString) ? connectionString : options.ConnectionString;
+            await using var connection = new MySqlConnection(cs);
+            await connection.OpenAsync(ct);
+            await using var command = new MySqlCommand($"""
+                SELECT a.email, e.email
+                FROM `{db}`.dtbl_employee_emails a
+                JOIN `{db}`.dtbl_employees e ON e.id = a.employee_pk
+                WHERE (e.active IS NULL OR e.active = 1) AND e.email IS NOT NULL AND e.email <> ''
+                """, connection);
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var alias = reader.GetString(0).Trim().ToLowerInvariant();
+                var primary = reader.GetString(1).Trim().ToLowerInvariant();
+                if (alias.Contains('@') && primary.Contains('@')) map[alias] = primary;
+            }
+        }
+        catch (MySqlException) { /* table not created yet or no SELECT right: only primary emails work */ }
+        return map;
     }
 
     // The local table only changes through ReplaceSourceAsync (which clears the cache), so it never expires on its own.
