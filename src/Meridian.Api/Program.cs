@@ -195,7 +195,11 @@ app.MapGet("/auth/login", (string? returnUrl) =>
         target = returnUrl;
     return Results.Challenge(new AuthenticationProperties { RedirectUri = target }, ["EntraID"]);
 }).AllowAnonymous();
-app.MapGet("/auth/status", () => Results.Ok(new { microsoft = entraConfigured })).AllowAnonymous();
+// crmUrl: the link on the sign-in page to the other system (LoginLinks:CrmUrl); only ever a plain http(s) address.
+var crmLoginLink = builder.Configuration["LoginLinks:CrmUrl"]?.Trim().TrimEnd('/');
+if (!Uri.TryCreate(crmLoginLink, UriKind.Absolute, out var crmLinkUri) || (crmLinkUri.Scheme != Uri.UriSchemeHttp && crmLinkUri.Scheme != Uri.UriSchemeHttps))
+    crmLoginLink = null;
+app.MapGet("/auth/status", () => Results.Ok(new { microsoft = entraConfigured, crmUrl = crmLoginLink })).AllowAnonymous();
 app.MapControllers();
 app.MapFallback("/api/{**path}", () => Results.NotFound());
 app.MapFallbackToFile("index.html");

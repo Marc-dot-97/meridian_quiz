@@ -13,6 +13,18 @@ public sealed class LocalAccountService(HttpClient http, LocalAuthenticationStat
         }
         catch { return true; }   // if the check itself fails, still show the button; the server will say what is wrong
     }
+    // Sign-in page: is Microsoft sign-in configured, and where is the link to the CRM (LoginLinks:CrmUrl on the server)?
+    public async Task<(bool Microsoft, string? CrmUrl)> SignInStatusAsync()
+    {
+        try
+        {
+            var status = await http.GetFromJsonAsync<System.Text.Json.JsonElement>("auth/status");
+            var microsoft = status.TryGetProperty("microsoft", out var m) && m.GetBoolean();
+            string? crm = status.TryGetProperty("crmUrl", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.String ? c.GetString() : null;
+            return (microsoft, crm);
+        }
+        catch { return (true, null); }   // same rule as above: if the check fails, still show the button
+    }
     // DEV BYPASS: the API answers 404 here unless the bypass is enabled on that server.
     public async Task<bool> DevBypassAvailableAsync()
     {
