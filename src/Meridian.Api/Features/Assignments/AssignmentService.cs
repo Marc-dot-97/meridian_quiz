@@ -17,17 +17,31 @@ namespace Meridian.Api.Features.Assignments;
 public sealed record AssignmentViewer(User User, IReadOnlySet<string> Departments, ReportScope Scope, IReadOnlyList<string> AllDepartments)
 {
     public bool SeesEverything => Scope.Role is ReportRole.SuperAdmin or ReportRole.HR;
-    public bool CanAssign => Scope.Role != ReportRole.Staff;
+    /// <summary>SuperAdmin, HR or line manager: creates quizzes and manages every quiz and survey.</summary>
+    public bool IsAuthor => Scope.Role != ReportRole.Staff;
 
-    /// <summary>Departments this person may add or remove (case-insensitive).</summary>
-    public IReadOnlySet<string> AssignableDepartments => Scope.Departments.ToHashSet(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Quizzes: authors only. Surveys: everyone (staff assign their own surveys to their own departments).</summary>
+    public bool CanAssign(string kind) => kind == AssignmentKinds.Survey || IsAuthor;
 
     /// <summary>
-    /// "Only assigned departments may see it" and the due date may be changed by SuperAdmin/HR, or by an author whose
-    /// departments cover every department currently assigned (so a line manager cannot change another team's setting).
+    /// Departments this person may add or remove (case-insensitive).
+    ///   Quiz:   SuperAdmin/HR every department, line manager the managed departments.
+    ///   Survey: the same, plus the person's own department(s), so staff can survey their own team.
     /// </summary>
-    public bool CanEditSettings(ItemAssignment current) =>
-        SeesEverything || (CanAssign && current.Departments.All(AssignableDepartments.Contains));
+    public IReadOnlySet<string> AssignableDepartments(string kind)
+    {
+        var set = Scope.Departments.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (kind == AssignmentKinds.Survey)
+            set.UnionWith(Departments.Where(d => AllDepartments.Contains(d, StringComparer.OrdinalIgnoreCase)));
+        return set;
+    }
+
+    /// <summary>
+    /// "Only assigned departments may see it" and the due date may be changed by SuperAdmin/HR, or by someone whose
+    /// assignable departments cover every department currently assigned (so a line manager cannot change another team's setting).
+    /// </summary>
+    public bool CanEditSettings(string kind, ItemAssignment current) =>
+        SeesEverything || (CanAssign(kind) && current.Departments.All(AssignableDepartments(kind).Contains));
 }
 
 public sealed class AssignmentService(MeridianDbContext db, EmployeeDirectoryStore directory, ReportAccessService access, AssignmentStore store)
@@ -76,7 +90,7 @@ public sealed class AssignmentService(MeridianDbContext db, EmployeeDirectorySto
     /// </summary>
     public async Task<(ItemAssignment? Final, string? Error)> PrepareAsync(AssignmentViewer viewer, string kind, string? id, AssignmentRequest request, CancellationToken ct)
     {
-        if (!viewer.CanAssign) return (null, "Only line managers, HR and administrators can assign quizzes and surveys.");
+        if (!viewer.CanAssign(kind)) return (null, "Only line managers, HR and administrators can assign quizzes.");
         var errors = AssignmentValidation.Validate(request);
         if (errors.Count > 0) return (null, string.Join(" ", errors));
 
@@ -90,7 +104,7 @@ public sealed class AssignmentService(MeridianDbContext db, EmployeeDirectorySto
 
         var current = id is null ? ItemAssignment.None(kind, "") : await store.GetAsync(kind, id, ct);
         var currentSet = current.Departments.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var mine = viewer.AssignableDepartments;
+        var mine = viewer.AssignableDepartments(kind);
         var outside = requested.Where(d => !currentSet.Contains(d) && !mine.Contains(d)).ToList();
         if (outside.Count > 0)
             return (null, $"You can only assign the departments you manage. Not allowed: {string.Join(", ", outside.OrderBy(d => d))}.");
@@ -99,7 +113,7 @@ public sealed class AssignmentService(MeridianDbContext db, EmployeeDirectorySto
         requested.RemoveWhere(d => !mine.Contains(d) && !currentSet.Contains(d));
 
         var settingsChanged = request.AssignedOnly != current.AssignedOnly || request.DueOn != current.DueOn;
-        if (settingsChanged && !viewer.CanEditSettings(current))
+        if (settingsChanged && !viewer.CanEditSettings(kind, current))
             return (null, "Another department's manager set who can see this and the due date; ask them, HR or an administrator to change it.");
 
         var final = new ItemAssignment(kind, id ?? "", requested.OrderBy(d => d).ToList(), request.AssignedOnly, request.DueOn);

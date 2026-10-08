@@ -1,5 +1,5 @@
 @page "/assignments"
-@attribute [Authorize(Policy = "QuizAuthor")]
+@attribute [Authorize]
 @inject HttpClient Http
 
 <PageTitle>Meridian | Assignments</PageTitle>
@@ -15,11 +15,20 @@
             <div class="assign-head">
                 <div>
                     <h2>Who has to do what</h2>
-                    <p class="assign-lead">Assign quizzes and surveys to departments, set a due date and see who still has to finish.
-                        @(_role is "LineManager" ? "You can assign the departments you manage." : "")</p>
+                    <p class="assign-lead">
+                        @if (_isAuthor)
+                        {
+                            <text>Assign quizzes and surveys to departments, set a due date and see who still has to finish.
+                            @(_role is "LineManager" ? "You can assign the departments you manage." : "")</text>
+                        }
+                        else
+                        {
+                            <text>Choose which of your departments has to answer the surveys you created, and see how many have finished.</text>
+                        }
+                    </p>
                 </div>
                 <div class="assign-head-actions">
-                    <a href="quiz-builder" class="btn-arc btn-arc--quiz"><span>+ Quiz</span></a>
+                    @if (_isAuthor) { <a href="quiz-builder" class="btn-arc btn-arc--quiz"><span>+ Quiz</span></a> }
                     <a href="surveys" class="btn-arc btn-arc--surveys"><span>+ Surveys</span></a>
                 </div>
             </div>
@@ -98,7 +107,7 @@
                             @if (editing && _draft is not null)
                             {
                                 <div class="assign-editor">
-                                    <AssignmentPicker Value="_draft" Locked="_locked" Noun="@(r.Kind == AssignmentKinds.Quiz ? "quiz" : "survey")" />
+                                    <AssignmentPicker Value="_draft" Locked="_locked" Kind="@r.Kind" Noun="@(r.Kind == AssignmentKinds.Quiz ? "quiz" : "survey")" />
                                     @if (_saveError is not null) { <p class="assign-error" role="alert">@_saveError</p> }
                                     <div class="assign-editor-actions">
                                         <button type="button" class="assign-link" @onclick="CancelEdit" disabled="@_saving">Cancel</button>
@@ -127,8 +136,10 @@
 @code {
     private static readonly (string Key, string Label)[] Tabs = [("all", "All"), ("assigned", "Assigned"), ("open", "Not assigned")];
     private List<AssignmentOverviewDto> _rows = [];
-    private HashSet<string> _mine = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _mine = new(StringComparer.OrdinalIgnoreCase), _mineSurvey = new(StringComparer.OrdinalIgnoreCase);
     private string? _role;
+    private bool _isAuthor;
+    private HashSet<string> Mine(AssignmentOverviewDto r) => r.Kind == AssignmentKinds.Survey ? _mineSurvey : _mine;
     private bool _loading = true, _saving;
     private string? _error, _saveError, _status;
     private string _tab = "all", _search = "";
@@ -157,9 +168,14 @@
         _loading = true; _error = null;
         try
         {
-            var departments = await Http.GetFromJsonAsync<AssignableDepartmentsDto>("api/assignments/departments");
-            _role = departments?.Role;
-            _mine = (departments?.Departments ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // Quiz departments (authors) and survey departments (everyone: also the person's own department).
+            var surveyDepartments = await Http.GetFromJsonAsync<AssignableDepartmentsDto>("api/assignments/departments?kind=survey");
+            _role = surveyDepartments?.Role;
+            _isAuthor = _role is not null and not "Staff";
+            _mineSurvey = (surveyDepartments?.Departments ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _mine = _isAuthor
+                ? ((await Http.GetFromJsonAsync<AssignableDepartmentsDto>("api/assignments/departments?kind=quiz"))?.Departments ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             _rows = await Http.GetFromJsonAsync<List<AssignmentOverviewDto>>("api/assignments") ?? [];
         }
         catch (Exception ex) { _error = "Assignments could not be loaded. " + ex.Message; }
@@ -170,10 +186,11 @@
     {
         _editing = Key(r);
         _saveError = null; _status = null;
-        _locked = r.Departments.Where(d => !_mine.Contains(d)).ToList();
+        var mine = Mine(r);
+        _locked = r.Departments.Where(d => !mine.Contains(d)).ToList();
         _draft = new AssignmentRequest
         {
-            Departments = r.Departments.Where(_mine.Contains).ToList(),
+            Departments = r.Departments.Where(mine.Contains).ToList(),
             AssignedOnly = r.AssignedOnly,
             DueOn = r.DueOn
         };

@@ -62,6 +62,15 @@ public sealed class AssignmentStore(string connectionString)
                 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci
                 """, connection))
                 await create.ExecuteNonQueryAsync(ct);
+
+            // Staff can create surveys: remember who created each survey (older surveys keep NULL).
+            await using var check = new MySqlCommand(
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'surveys' AND column_name = 'created_by_user_id'", connection);
+            if (Convert.ToInt32(await check.ExecuteScalarAsync(ct)) == 0)
+            {
+                await using var alter = new MySqlCommand("ALTER TABLE surveys ADD COLUMN created_by_user_id bigint unsigned NULL", connection);
+                await alter.ExecuteNonQueryAsync(ct);
+            }
         }
         finally
         {

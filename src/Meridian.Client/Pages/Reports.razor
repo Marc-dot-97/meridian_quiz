@@ -88,8 +88,10 @@
                 <div class="encounter-eyebrow">SuperAdmin</div>
                 <h2 class="report-title">Employee list</h2>
                 <p class="detail-copy">
-                    Line managers and HR are worked out from this list (the Employees sheet of the company workbook).
-                    Upload a new version whenever staff or managers change. It replaces the previous upload.
+                    Line managers, HR and departments are worked out from the employee list. On the live server the list
+                    comes from the CRM, and this upload (the Employees sheet of the company workbook) fills the gaps: missing
+                    emails are filled in and people not on the CRM are added. Leavers on the CRM are never added back.
+                    Each upload replaces the previous one.
                 </p>
                 @if (_directory is not null)
                 {

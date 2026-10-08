@@ -9,6 +9,8 @@ public sealed class SurveyRecord
     public string Title { get; set; } = "";
     public string DefinitionJson { get; set; } = "";
     public DateTime CreatedAt { get; set; }
+    /// <summary>Who created the survey (null for surveys created before this was recorded). Staff see and manage their own surveys.</summary>
+    public ulong? CreatedByUserId { get; set; }
 }
 public sealed class SurveySetting
 {
@@ -98,6 +100,7 @@ public partial class MeridianDbContext
             entity.Property(x => x.Title).HasColumnName("title").HasMaxLength(200);
             entity.Property(x => x.DefinitionJson).HasColumnName("definition_json").HasColumnType("longtext");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime(6)");
+            entity.Property(x => x.CreatedByUserId).HasColumnName("created_by_user_id");
         });
         modelBuilder.Entity<SurveySetting>(entity =>
         {

@@ -14,22 +14,28 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
     Meridian.Api.Features.Assignments.AssignmentService assignments, Meridian.Api.Features.Assignments.AssignmentStore assignmentStore,
     ILogger<SurveysController> logger) : ControllerBase
 {
+    /// <summary>Surveys page: authors see every survey, staff see the surveys they created.</summary>
     [HttpGet]
-    [Authorize(Roles = "QuizAuthor,Admin")]
     public async Task<ActionResult<List<SurveyListItemDto>>> List(CancellationToken ct)
     {
-        var records = await db.Surveys.AsNoTracking().OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        var userId = await CurrentUserIdAsync(ct);
+        if (userId is null) return Forbid();
+        var all = User.IsInRole("QuizAuthor") || User.IsInRole("Admin");
+        var records = await db.Surveys.AsNoTracking().Where(x => all || x.CreatedByUserId == userId.Value)
+            .OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
         var counts = await db.SurveyCompletions.AsNoTracking().GroupBy(x => x.SurveyId)
             .Select(g => new { Id = g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Id, x => x.Count, ct);
         return records.Select(x => new SurveyListItemDto(x.Id, x.Title, Decode(x).Questions.Count,
             DateTime.SpecifyKind(x.CreatedAt, DateTimeKind.Utc), counts.GetValueOrDefault(x.Id))).ToList();
     }
 
+    /// <summary>Everyone can create surveys (staff included); quizzes stay with SuperAdmin, HR and line managers.</summary>
     [HttpPost]
-    [Authorize(Roles = "QuizAuthor,Admin")]
     [RequestSizeLimit(1_000_000)]
     public async Task<ActionResult<SurveyDto>> Create(CreateSurveyRequest request, CancellationToken ct)
     {
+        var creatorId = await CurrentUserIdAsync(ct);
+        if (creatorId is null) return Forbid();
         var errors = SurveyValidation.Definition(request);
         if (errors.Count > 0) return BadRequest(new { message = string.Join(" ", errors) });
         Meridian.Api.Features.Assignments.ItemAssignment? assignment = null;
@@ -43,7 +49,7 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
             assignment = prepared;
         }
         var survey = new SurveyDto(Guid.NewGuid(), request.Title.Trim(), request.Description?.Trim() ?? "", request.Questions, DateTime.UtcNow);
-        db.Surveys.Add(new SurveyRecord { Id = survey.Id, Title = survey.Title, DefinitionJson = JsonSerializer.Serialize(survey), CreatedAt = survey.CreatedAt, DeleteAfter = request.AddToArchive ? survey.CreatedAt.AddMonths(24) : null });
+        db.Surveys.Add(new SurveyRecord { Id = survey.Id, Title = survey.Title, DefinitionJson = JsonSerializer.Serialize(survey), CreatedAt = survey.CreatedAt, CreatedByUserId = creatorId, DeleteAfter = request.AddToArchive ? survey.CreatedAt.AddMonths(24) : null });
         await db.SaveChangesAsync(ct);
         if (assignment is not null && viewer is not null)
         {

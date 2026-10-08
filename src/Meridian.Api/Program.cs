@@ -132,12 +132,13 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<MeridianDbContext>();
     await db.Database.EnsureCreatedAsync();
+    // Assignments tables + surveys.created_by_user_id, before anything reads surveys through EF.
+    await assignmentStore.EnsureSchemaAsync();
     await Meridian.Api.Features.Retention.RetentionMaintenance.EnsureSchemaAsync(connectionString);
     await directoryStore.EnsureSchemaAsync();
     // Survey anonymity: split table + one-off copy of existing responses (idempotent).
     await Meridian.Api.Features.Surveys.SurveyAnonymity.EnsureSchemaAsync(connectionString);
     await Meridian.Api.Features.Surveys.SurveyAnonymity.BackfillAsync(db, directoryStore, app.Logger);
-    await assignmentStore.EnsureSchemaAsync();
     await Meridian.Api.Features.Retention.RetentionMaintenance.CleanupAsync(connectionString, app.Logger, CancellationToken.None);
     await assignmentStore.DeleteOrphansAsync();
     // DEV SEED from the command line: dotnet run --launch-profile https -- --seed   (or --seed-reset / --seed-clear)

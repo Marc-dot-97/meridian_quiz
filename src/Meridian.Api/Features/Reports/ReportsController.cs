@@ -33,7 +33,7 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
     {
         var (_, scope, _) = await ContextAsync(ct);
         return new ReportAccessDto(scope.Role.ToString(), scope.Departments.ToList(),
-            scope.Role != ReportRole.Staff, scope.Role == ReportRole.SuperAdmin && !directory.UsesCrm, scope.Role != ReportRole.Staff);
+            scope.Role != ReportRole.Staff, scope.Role == ReportRole.SuperAdmin, scope.Role != ReportRole.Staff);
     }
 
     /// <summary>
@@ -313,7 +313,7 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
     {
         var (me, scope, _) = await ContextAsync(ct);
         if (scope.Role != ReportRole.SuperAdmin) return StatusCode(403, new { message = "Only a SuperAdmin can manage the employee list." });
-        if (directory.UsesCrm) return Conflict(new { message = "Employees now come straight from the CRM, so there is no list to upload. Change them in the CRM (Management > Employees)." });
+        // In "crm" mode the upload is a supplement: it fills missing emails and adds people not on the CRM (never leavers).
         if (file is null || file.Length == 0) return BadRequest(new { message = "Choose an .xlsx file." });
         if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)) return BadRequest(new { message = "Upload the employee list as an .xlsx file." });
 
@@ -330,6 +330,13 @@ public sealed class ReportController(MeridianDbContext db, EmployeeDirectoryStor
         if (rows.Count == 0) return BadRequest(new { message = "No employees found. " + string.Join(" ", warnings) });
         await directory.ReplaceSourceAsync("import", rows, ct);
         log.LogWarning("Employee list imported by {User}: {Count} rows", me.Email, rows.Count);
+        if (directory.UsesCrm)
+        {
+            await directory.GetAllAsync(ct);   // re-merge now so the numbers below are current
+            if (directory.SupplementStats is { } st)
+                warnings.Insert(0, $"Combined with the CRM: {st.EmailsFilled} missing CRM email(s) filled in, {st.Added} employee(s) not on the CRM added"
+                    + (st.LeaversSkipped > 0 ? $", {st.LeaversSkipped} leaver(s) on the list skipped." : "."));
+        }
         return new DirectoryImportResultDto(rows.Count, warnings.Take(30).ToList());
     }
 }

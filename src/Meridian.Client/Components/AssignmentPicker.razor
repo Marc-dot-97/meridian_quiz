@@ -34,7 +34,7 @@
         }
         @if (_departments.Count == 0)
         {
-            <p class="assign-note">No departments are linked to you yet. HR or an administrator can assign this @Noun.</p>
+            <p class="assign-note">No department is linked to your account yet, so this @Noun stays open to everyone. HR can link you to your department on the employee list.</p>
         }
         else
         {
@@ -88,6 +88,8 @@
     [Parameter, EditorRequired] public AssignmentRequest Value { get; set; } = new();
     /// <summary>"quiz" or "survey", used in the wording.</summary>
     [Parameter] public string Noun { get; set; } = "quiz";
+    /// <summary>AssignmentKinds.Quiz or .Survey: surveys also offer the person's own department(s).</summary>
+    [Parameter] public string Kind { get; set; } = AssignmentKinds.Quiz;
     /// <summary>Departments already assigned by someone else that this author may not change (shown read-only).</summary>
     [Parameter] public IReadOnlyCollection<string>? Locked { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
@@ -111,7 +113,7 @@
         _loading = true; _error = null;
         try
         {
-            var result = await Http.GetFromJsonAsync<AssignableDepartmentsDto>("api/assignments/departments");
+            var result = await Http.GetFromJsonAsync<AssignableDepartmentsDto>($"api/assignments/departments?kind={Kind}");
             _departments = result?.Departments ?? [];
         }
         catch (Exception ex) { _error = "Departments could not be loaded. " + ex.Message; }

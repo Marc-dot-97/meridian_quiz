@@ -1,5 +1,5 @@
 @page "/surveys"
-@attribute [Authorize(Policy = "QuizAuthor")]
+@attribute [Authorize]
 @inject SurveyService SurveysApi
 @inject IConfiguration Configuration
 
@@ -79,7 +79,7 @@
                 <button type="button" class="survey-add" disabled="@(Draft.Questions.Count >= 50)" @onclick="() => Draft.Questions.Add(new())">＋ Add question</button>
                 <section class="survey-card">
                     <p class="survey-eyebrow">ASSIGN</p><h2>Who has to do this survey?</h2>
-                    <AssignmentPicker Value="Draft.Assignment!" Noun="survey" />
+                    <AssignmentPicker Value="Draft.Assignment!" Noun="survey" Kind="@AssignmentKinds.Survey" />
                 </section>
                 <section class="survey-card">
                     <label class="survey-checkbox-label"><InputCheckbox @bind-Value="Draft.AddToArchive" /><span>Add to archive</span></label>
