@@ -5,7 +5,6 @@ using Meridian.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Meridian.Api.Features.Quizzes;
 
@@ -97,11 +96,10 @@ public sealed class QuizBuilderController(MeridianDbContext db, ILogger<QuizBuil
             // Failsafe: the departments (and "only these departments") are saved in the SAME transaction as the quiz.
             // If they cannot be saved the whole quiz is rolled back, so a quiz meant to be restricted is never saved open to everyone.
             if (assignment is not null)
-                await assignmentStore.SaveAsync(assignment with { Id = quiz.Id.ToString() }, quiz.CreatedByUserId ?? 0,
-                    (MySqlConnector.MySqlConnection)db.Database.GetDbConnection(), (MySqlConnector.MySqlTransaction)transaction.GetDbTransaction(), ct);
+                await Meridian.Api.Features.Assignments.AssignmentStore.SaveNewAsync(db.Database, assignment with { Id = quiz.Id.ToString() }, quiz.CreatedByUserId ?? 0, ct);
             await transaction.CommitAsync(ct);
         }
-        catch (Exception ex) when (ex is DbUpdateException or MySqlConnector.MySqlException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Quiz builder could not save the quiz");
             return Problem(statusCode: 500, title: "Quiz could not be saved",

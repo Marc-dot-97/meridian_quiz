@@ -4,7 +4,6 @@ using Meridian.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Meridian.Api.Features.Surveys;
 
@@ -60,11 +59,10 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
             db.Surveys.Add(new SurveyRecord { Id = survey.Id, Title = survey.Title, DefinitionJson = JsonSerializer.Serialize(survey), CreatedAt = survey.CreatedAt, CreatedByUserId = creatorId, DeleteAfter = request.AddToArchive ? survey.CreatedAt.AddMonths(24) : null });
             await db.SaveChangesAsync(ct);
             if (assignment is not null)
-                await assignmentStore.SaveAsync(assignment with { Id = survey.Id.ToString() }, viewer.User.Id,
-                    (MySqlConnector.MySqlConnection)db.Database.GetDbConnection(), (MySqlConnector.MySqlTransaction)transaction.GetDbTransaction(), ct);
+                await Meridian.Api.Features.Assignments.AssignmentStore.SaveNewAsync(db.Database, assignment with { Id = survey.Id.ToString() }, viewer.User.Id, ct);
             await transaction.CommitAsync(ct);
         }
-        catch (Exception ex) when (ex is DbUpdateException or MySqlConnector.MySqlException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Survey {SurveyId} could not be saved with its departments", survey.Id);
             return Problem(statusCode: 500, title: "Survey could not be saved",
