@@ -6,55 +6,134 @@
 
 <PageTitle>Meridian | Sign in</PageTitle>
 
-<div class="login-screen">
-    <svg class="login-ambient-arc" viewBox="0 0 200 110" aria-hidden="true">
-        <path d="M10,100 A90,90 0 0 1 190,100" fill="none" stroke="var(--muted-orange)" stroke-width="1" />
+@* PrimeBridge sign-in design (7 Oct 2026). Styles: wwwroot/css/pb-login.css, everything scoped under .pb-login. *@
+<div class="pb-login @(string.IsNullOrWhiteSpace(Message) ? "is-intro" : "")">
+  <main class="auth">
+
+    <svg class="backdrop backdrop--desktop" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="lime-shine" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#C9EE5E"/>
+          <stop offset="0.5" stop-color="#9BC53D"/>
+          <stop offset="1" stop-color="#6F9A22"/>
+        </linearGradient>
+      </defs>
+      <polygon points="0,0 860,0 700,900 0,900" fill="url(#lime-shine)"/>
+      <polygon points="0,640 776,470 700,900 0,900" fill="#2E3236" fill-opacity="0.12"/>
+      <polygon points="0,800 746,640 700,900 0,900" fill="#2E3236" fill-opacity="0.10"/>
+      <polygon points="0,0 860,0 856,22 0,22" fill="#FFFFFF" fill-opacity="0.18"/>
+      <line x1="0" y1="640" x2="776" y2="470" stroke="#E4F79A" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+      <line x1="0" y1="800" x2="746" y2="640" stroke="#E4F79A" stroke-opacity="0.55" stroke-width="1" vector-effect="non-scaling-stroke"/>
+      <line x1="890" y1="0" x2="730" y2="900" stroke="#9BC53D" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+      <line x1="904" y1="0" x2="868" y2="200" stroke="#9BC53D" stroke-opacity="0.5" stroke-width="1" vector-effect="non-scaling-stroke"/>
     </svg>
 
-    <div class="login-content auth-panel">
-        <h1 class="login-wordmark">Meridian</h1>
-        <p class="login-tagline">Learn, grow and share your voice</p>
+    <svg class="backdrop backdrop--mobile" viewBox="0 0 390 340" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="lime-shine-m" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#C9EE5E"/>
+          <stop offset="0.5" stop-color="#9BC53D"/>
+          <stop offset="1" stop-color="#6F9A22"/>
+        </linearGradient>
+      </defs>
+      <polygon points="0,0 390,0 390,250 0,320" fill="url(#lime-shine-m)"/>
+      <polygon points="0,262 390,196 390,250 0,320" fill="#2E3236" fill-opacity="0.12"/>
+      <line x1="0" y1="262" x2="390" y2="196" stroke="#E4F79A" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+      <line x1="0" y1="334" x2="390" y2="264" stroke="#9BC53D" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+    </svg>
 
-            @if (!string.IsNullOrWhiteSpace(Message))
-            {
-                <div class="auth-error" role="alert">@Message</div>
-            }
+    <section class="brand-panel">
+      <div class="brand-logo reveal" style="--i:0"><img class="pb-wordmark" src="images/prime/primebridge-wordmark-charcoal.svg" alt="PrimeBridge" /></div>
+      <div class="brand-copy">
+        <p class="hero reveal" style="--i:2">Your back office,<br />at its best.</p>
+        <p class="hero-sub reveal" style="--i:3">IT, Finance and HR support delivered as one dependable team.</p>
+      </div>
+    </section>
 
-            @if (MicrosoftAvailable)
-            {
-                <button class="quiz-start auth-submit" type="button" disabled="@Busy" @onclick="SignInWithMicrosoft">
-                    @(Busy ? "Opening Microsoft…" : "Sign in with Microsoft")
+    <section class="form-panel">
+      <div class="form-wrap">
+        <nav class="system-switch reveal" style="--i:1" aria-label="PrimeBridge systems">
+          <p class="system-label">SIGNING IN TO</p>
+          <p class="system-current">Meridian CPD</p>
+          @if (!string.IsNullOrWhiteSpace(CrmUrl))
+          {
+              <ul class="system-others">
+                <li>
+                  <a href="@CrmUrl" target="_blank" rel="noopener noreferrer" class="system-link">
+                    <span>Optimum CRM</span>
+                    <svg class="icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="miter"><path d="M14 4 H20 V10" /><path d="M20 4 L11 13" /><path d="M18 14 V20 H4 V6 H10" /></g></svg>
+                    <span class="visually-hidden">(opens in a new tab)</span>
+                  </a>
+                </li>
+              </ul>
+          }
+        </nav>
+
+        <div class="form-head reveal" style="--i:2">
+          <div class="form-mark"><img class="pb-mark" src="images/prime/primebridge-mark-on-dark.svg" alt="PrimeBridge" /></div>
+          <h1>Sign in</h1>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <div class="alert alert--error" role="alert">
+              <svg class="icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 3 L22 20.5 H2 Z" fill="#FF6B5B" /><path d="M12 9 V14 M12 16.5 V18" fill="none" stroke="#2E3236" stroke-width="2.2" stroke-linecap="square" /></svg>
+              <span>@Message</span>
+            </div>
+        }
+
+        <div class="login-form microsoft-only">
+          @if (MicrosoftAvailable)
+          {
+              <div class="actions reveal" style="--i:3">
+                <button class="btn btn--primary @(Busy ? "is-loading" : "")" type="button" disabled="@Busy" aria-busy="@(Busy ? "true" : "false")" @onclick="SignInWithMicrosoft">
+                  <span class="btn-label">@(Busy ? "OPENING MICROSOFT" : "SIGN IN WITH MICROSOFT 365")</span>
+                  <span class="btn-icon"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M4 12 H19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" /><path d="M13 6 L19 12 L13 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" stroke-linejoin="miter" /></svg></span>
+                  <span class="btn-progress" aria-hidden="true"></span>
                 </button>
-                <p class="auth-switch">Use your Optimum work account, the same one you use for the CRM.</p>
-            }
-            else
-            {
-                <div class="auth-error" role="alert">Microsoft sign-in is not set up on this server yet.</div>
-            }
+              </div>
+              <p class="microsoft-hint reveal" style="--i:4">Use your Optimum work account, the same one you use for the CRM. You will be taken to Microsoft to sign in, then straight into Meridian.</p>
+          }
+          else
+          {
+              <div class="alert alert--error" role="alert">
+                <svg class="icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 3 L22 20.5 H2 Z" fill="#FF6B5B" /><path d="M12 9 V14 M12 16.5 V18" fill="none" stroke="#2E3236" stroke-width="2.2" stroke-linecap="square" /></svg>
+                <span>Microsoft sign-in is not set up on this server yet.</span>
+              </div>
+          }
+        </div>
 
-            @if (DevBypass)
-            {
-                @* DEV BYPASS: only rendered when the API reports it is enabled (never on production). *@
-                <div class="dev-bypass" style="margin-top:20px; padding:12px; border:1px dashed var(--muted-orange); border-radius:8px;">
-                    <div style="font-size:0.7rem; letter-spacing:0.08em; text-transform:uppercase; opacity:0.8; margin-bottom:8px;">Dev bypass · local / dev only</div>
-                    <input class="auth-input" placeholder="Optional: sign in as this email" @bind="DevEmail" autocomplete="off" />
-                    <button class="quiz-start auth-submit" type="button" style="margin-top:8px;" disabled="@Busy" @onclick="DevSignInAsync">
-                        @(string.IsNullOrWhiteSpace(DevEmail) ? "Dev sign-in (Dev Admin)" : "Dev sign-in as user")
-                    </button>
-                    <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-                        <button class="quiz-start" type="button" style="flex:1; font-size:0.75rem;" disabled="@Busy" @onclick="() => SeedAsync(false, false)">Seed dummy data</button>
-                        <button class="quiz-start" type="button" style="flex:1; font-size:0.75rem;" disabled="@Busy" @onclick="() => SeedAsync(true, false)">Reset seed</button>
-                        <button class="quiz-start" type="button" style="flex:1; font-size:0.75rem;" disabled="@Busy" @onclick="() => SeedAsync(false, true)">Clear seed</button>
-                    </div>
-                    @if (!string.IsNullOrWhiteSpace(SeedMessage))
-                    {
-                        <div style="margin-top:8px; font-size:0.75rem; opacity:0.85;">@SeedMessage</div>
-                    }
-                </div>
-            }
-    </div>
+        @if (DevBypass)
+        {
+            @* DEV BYPASS: only rendered when the API reports it is enabled (never on production). *@
+            <div class="dev-tools">
+              <p class="dev-tools-title">Dev bypass · local / dev only</p>
+              <input type="text" placeholder="Optional: sign in as this email" @bind="DevEmail" autocomplete="off" />
+              <button class="btn btn--ghost btn--small" type="button" disabled="@Busy" @onclick="DevSignInAsync">
+                @(string.IsNullOrWhiteSpace(DevEmail) ? "Dev sign-in (Dev Admin)" : "Dev sign-in as user")
+              </button>
+              <div class="dev-row">
+                <button class="btn btn--ghost btn--small" type="button" disabled="@Busy" @onclick="() => SeedAsync(false, false)">Seed dummy data</button>
+                <button class="btn btn--ghost btn--small" type="button" disabled="@Busy" @onclick="() => SeedAsync(true, false)">Reset seed</button>
+                <button class="btn btn--ghost btn--small" type="button" disabled="@Busy" @onclick="() => SeedAsync(false, true)">Clear seed</button>
+              </div>
+              @if (!string.IsNullOrWhiteSpace(SeedMessage))
+              {
+                  <p class="dev-note">@SeedMessage</p>
+              }
+            </div>
+        }
+      </div>
 
-    <p class="login-footer">MERIDIAN · PRIMEBRIDGE</p>
+      <footer class="form-footer reveal" style="--i:7">
+        <span class="footer-rule"></span>
+        <div class="footer-row">
+          <span>&copy; @DateTime.Now.Year PrimeBridge</span>
+          <a href="mailto:support@optimumgroup.co.za" class="link link--muted">Contact Support</a>
+        </div>
+      </footer>
+    </section>
+  </main>
 </div>
 
 @code {
@@ -64,6 +143,7 @@
     private bool Busy;
     private bool DevBypass;
     private bool MicrosoftAvailable = true;
+    private string? CrmUrl;
     private string? DevEmail;
     private string? Error;
     private string? SeedMessage;
@@ -78,7 +158,9 @@
     protected override async Task OnInitializedAsync()
     {
         DevBypass = await Accounts.DevBypassAvailableAsync();
-        MicrosoftAvailable = await Accounts.MicrosoftSignInAvailableAsync();
+        var status = await Accounts.SignInStatusAsync();
+        MicrosoftAvailable = status.Microsoft;
+        CrmUrl = status.CrmUrl;
     }
 
     // Full page load on purpose: /auth/login is a server endpoint that redirects to Microsoft, not a Blazor page.
