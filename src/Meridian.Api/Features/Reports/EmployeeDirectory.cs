@@ -66,7 +66,7 @@ public static class DirectoryNames
 ///                  and line manager). Read-only; this is what production uses so Meridian and the CRM always agree.
 ///   Mode "local" : Meridian's own employee_directory table (uploaded Excel list or dev seed). Local development only.
 /// </summary>
-public sealed record DirectorySourceOptions(string Mode, string AdminDatabase, string ConnectionString)
+public sealed record DirectorySourceOptions(string Mode, string AdminDatabase, string ConnectionString, bool SupplementAddsPeople = false)
 {
     public bool UsesCrm => string.Equals(Mode, "crm", StringComparison.OrdinalIgnoreCase);
 }
@@ -121,7 +121,7 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
             {
                 var (crm, inactive) = await LoadFromCrmAsync(ct);
                 var (supplement, supplementAt) = await LoadLocalAsync("import", ct);
-                _cache = MergeWithSupplement(crm, supplement, inactive, out var stats);
+                _cache = MergeWithSupplement(crm, supplement, inactive, options!.SupplementAddsPeople, out var stats);
                 SupplementStats = stats;
                 _aliases = await LoadAliasesAsync(ct);
                 _cacheLoadedUtc = DateTime.UtcNow;
@@ -231,11 +231,12 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
     /// <summary>
     /// "crm" mode with an uploaded list (Full Company and employees.xlsx): the CRM stays the source of truth, the list only fills gaps.
     ///  1. A CRM employee without an email gets the email from the list (matched on employee number, else on a unique name + surname).
-    ///  2. Someone on the list who is not on the CRM at all is added (with the list's department, job title and line manager).
+    ///  2. Only when addPeople is true (config Directory:SupplementAddsPeople, default false): someone on the list who is not on the CRM at all is added
+    ///     (with the list's department, job title and line manager). Off by default so the CRM alone decides who can sign in.
     ///  3. Nobody the CRM marks as inactive (a leaver) is ever added back from the list.
     /// </summary>
     public static IReadOnlyList<DirectoryEmployee> MergeWithSupplement(IReadOnlyList<DirectoryEmployee> crm, IReadOnlyList<DirectoryEmployee> list,
-        InactiveEmployees inactive, out SupplementStats stats)
+        InactiveEmployees inactive, bool addPeople, out SupplementStats stats)
     {
         static string NameKey(string? first, string? surname) =>
             $"{DirectoryNames.Normalize(first)}|{DirectoryNames.Normalize(surname)}";
@@ -270,6 +271,7 @@ public sealed class EmployeeDirectoryStore(string connectionString, DirectorySou
         var added = 0; var skippedLeavers = 0;
         foreach (var e in list)
         {
+            if (!addPeople) continue;                                                       // CRM alone decides who exists
             if (used.Contains(e)) continue;
             if (e.Email is not null && emails.Contains(e.Email)) continue;                 // already on the CRM under that email
             if (NameKeys(e).Any(crmNames.Contains) && e.Email is null) continue;          // same person, nothing new to add

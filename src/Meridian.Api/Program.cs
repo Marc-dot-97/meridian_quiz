@@ -108,7 +108,8 @@ builder.Services.AddSingleton(devBypass);
 var directoryOptions = new Meridian.Api.Features.Reports.DirectorySourceOptions(
     builder.Configuration["Directory:Source"] ?? "local",
     builder.Configuration["Directory:AdminDatabase"] ?? "optimum_admin",
-    builder.Configuration["Directory:ConnectionString"] ?? "");
+    builder.Configuration["Directory:ConnectionString"] ?? "",
+    builder.Configuration.GetValue<bool>("Directory:SupplementAddsPeople"));
 var directoryStore = new Meridian.Api.Features.Reports.EmployeeDirectoryStore(connectionString, directoryOptions);
 builder.Services.AddSingleton(directoryStore);
 builder.Services.AddScoped<Meridian.Api.Features.Reports.ReportAccessService>();
