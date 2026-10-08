@@ -83,6 +83,8 @@ public static class RetentionMaintenance
                                 await Delete("DELETE ao FROM answer_options ao WHERE ao.question_id = @question AND NOT EXISTS (SELECT 1 FROM quiz_questions qq WHERE qq.question_id = @question)", question);
                                 await Delete("DELETE FROM questions WHERE id = @question AND NOT EXISTS (SELECT 1 FROM quiz_questions qq WHERE qq.question_id = @question)", question);
                             }
+                            await Delete("DELETE FROM content_assignments WHERE content_type = 'quiz' AND CAST(content_id AS UNSIGNED) = @id");
+                            await Delete("DELETE FROM content_assignment_settings WHERE content_type = 'quiz' AND CAST(content_id AS UNSIGNED) = @id");
                             await Delete("DELETE FROM quizzes WHERE id = @id");
                         }
                         else
@@ -91,6 +93,8 @@ public static class RetentionMaintenance
                             await Delete("DELETE FROM survey_completions WHERE survey_id = @id");
                             await Delete("DELETE FROM survey_anonymous_answers WHERE survey_id = @id");
                             await Delete("DELETE FROM survey_responses WHERE survey_id = @id");
+                            await Delete("DELETE FROM content_assignments WHERE content_type = 'survey' AND content_id = @id");
+                            await Delete("DELETE FROM content_assignment_settings WHERE content_type = 'survey' AND content_id = @id");
                             await Delete("DELETE FROM surveys WHERE id = @id");
                         }
                         await tx.CommitAsync(ct);

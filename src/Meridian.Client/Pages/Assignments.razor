@@ -1,0 +1,213 @@
+@page "/assignments"
+@attribute [Authorize(Policy = "QuizAuthor")]
+@inject HttpClient Http
+
+<PageTitle>Meridian | Assignments</PageTitle>
+
+<div class="dash-page quizzes-page">
+    <div class="quizzes-content">
+        <div class="quizzes-topbar">
+            <div class="dash-brand"><BrandMark Page="Assignments" /></div>
+            <LoginDisplay />
+        </div>
+
+        <section class="block assign-page">
+            <div class="assign-head">
+                <div>
+                    <h2>Who has to do what</h2>
+                    <p class="assign-lead">Assign quizzes and surveys to departments, set a due date and see who still has to finish.
+                        @(_role is "LineManager" ? "You can assign the departments you manage." : "")</p>
+                </div>
+                <div class="assign-head-actions">
+                    <a href="quiz-builder" class="btn-arc btn-arc--quiz"><span>+ Quiz</span></a>
+                    <a href="surveys" class="btn-arc btn-arc--surveys"><span>+ Surveys</span></a>
+                </div>
+            </div>
+
+            @if (_loading)
+            {
+                <LoadingPanel Message="Loading assignments..." />
+            }
+            else if (_error is not null)
+            {
+                <ErrorPanel Message="@_error" />
+            }
+            else
+            {
+                <div class="assign-filters">
+                    <div class="assign-tabs" role="tablist" aria-label="Filter">
+                        @foreach (var (key, label) in Tabs)
+                        {
+                            var k = key;
+                            <button type="button" role="tab" aria-selected="@(_tab == k)" class="assign-tab @(_tab == k ? "is-on" : "")" @onclick="() => _tab = k">@label (@Count(k))</button>
+                        }
+                    </div>
+                    <input type="search" class="assign-search" placeholder="Find a quiz or survey" aria-label="Find a quiz or survey" @bind="_search" @bind:event="oninput" />
+                </div>
+
+                @if (_status is not null) { <p class="assign-status" role="status">@_status</p> }
+
+                @if (!Shown.Any())
+                {
+                    <div class="empty-completed">Nothing here yet.</div>
+                }
+                <div class="assign-list">
+                    @foreach (var row in Shown)
+                    {
+                        var r = row;
+                        var editing = _editing == Key(r);
+                        var percent = r.AssignedPeople == 0 ? 0 : (int)Math.Round(100.0 * r.CompletedPeople / r.AssignedPeople);
+                        <article class="assign-row @(r.Departments.Count > 0 ? "is-assigned" : "")" @key="Key(r)">
+                            <div class="assign-row-top">
+                                <div class="assign-row-main">
+                                    <span class="quiz-meta"><span class="quiz-tag">@(r.Kind == AssignmentKinds.Quiz ? "Quiz" : "Survey")</span>
+                                        @if (r.DueOn is DateOnly due)
+                                        {
+                                            <span class="assign-due-tag @(due < Today ? "is-late" : "")">Due @due.ToString("dd MMM yyyy")</span>
+                                        }
+                                        @if (r.AssignedOnly) { <span class="assign-due-tag">Assigned departments only</span> }
+                                    </span>
+                                    <h3>@r.Title</h3>
+                                    @if (r.Departments.Count == 0)
+                                    {
+                                        <p class="assign-meta">Open to everyone · nobody required</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="assign-meta">@string.Join(" · ", r.Departments)</p>
+                                        <div class="assign-progress" role="img" aria-label="@($"{r.CompletedPeople} of {r.AssignedPeople} people done")">
+                                            <span style="width:@(percent)%"></span>
+                                        </div>
+                                        <p class="assign-meta"><strong>@r.CompletedPeople of @r.AssignedPeople</strong> done (@percent%)</p>
+                                    }
+                                </div>
+                                <div class="assign-row-actions">
+                                    @if (r.CanEdit && !editing)
+                                    {
+                                        <button type="button" class="quiz-start" @onclick="() => StartEdit(r)">@(r.Departments.Count == 0 ? "Assign" : "Edit")</button>
+                                    }
+                                    @if (r.Outstanding.Count > 0)
+                                    {
+                                        <button type="button" class="assign-link" aria-expanded="@(_open.Contains(Key(r)))" @onclick="() => ToggleOutstanding(r)">
+                                            @(_open.Contains(Key(r)) ? "Hide" : "Show") outstanding (@r.Outstanding.Count)
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (editing && _draft is not null)
+                            {
+                                <div class="assign-editor">
+                                    <AssignmentPicker Value="_draft" Locked="_locked" Noun="@(r.Kind == AssignmentKinds.Quiz ? "quiz" : "survey")" />
+                                    @if (_saveError is not null) { <p class="assign-error" role="alert">@_saveError</p> }
+                                    <div class="assign-editor-actions">
+                                        <button type="button" class="assign-link" @onclick="CancelEdit" disabled="@_saving">Cancel</button>
+                                        <button type="button" class="quiz-start" @onclick="() => SaveAsync(r)" disabled="@_saving">@(_saving ? "Saving…" : "Save")</button>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (_open.Contains(Key(r)))
+                            {
+                                <ul class="assign-outstanding">
+                                    @foreach (var person in r.Outstanding)
+                                    {
+                                        <li><span>@person.Name</span><span class="assign-meta">@person.Department</span></li>
+                                    }
+                                </ul>
+                            }
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Tabs = [("all", "All"), ("assigned", "Assigned"), ("open", "Not assigned")];
+    private List<AssignmentOverviewDto> _rows = [];
+    private HashSet<string> _mine = new(StringComparer.OrdinalIgnoreCase);
+    private string? _role;
+    private bool _loading = true, _saving;
+    private string? _error, _saveError, _status;
+    private string _tab = "all", _search = "";
+    private string? _editing;
+    private AssignmentRequest? _draft;
+    private List<string> _locked = [];
+    private readonly HashSet<string> _open = [];
+
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(2));
+    private static string Key(AssignmentOverviewDto r) => $"{r.Kind}:{r.Id}";
+
+    private IEnumerable<AssignmentOverviewDto> Filtered(string tab) => _rows.Where(r => tab switch
+    {
+        "assigned" => r.Departments.Count > 0,
+        "open" => r.Departments.Count == 0,
+        _ => true
+    });
+    private int Count(string tab) => Filtered(tab).Count();
+    private IEnumerable<AssignmentOverviewDto> Shown => Filtered(_tab)
+        .Where(r => string.IsNullOrWhiteSpace(_search) || r.Title.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            var departments = await Http.GetFromJsonAsync<AssignableDepartmentsDto>("api/assignments/departments");
+            _role = departments?.Role;
+            _mine = (departments?.Departments ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _rows = await Http.GetFromJsonAsync<List<AssignmentOverviewDto>>("api/assignments") ?? [];
+        }
+        catch (Exception ex) { _error = "Assignments could not be loaded. " + ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void StartEdit(AssignmentOverviewDto r)
+    {
+        _editing = Key(r);
+        _saveError = null; _status = null;
+        _locked = r.Departments.Where(d => !_mine.Contains(d)).ToList();
+        _draft = new AssignmentRequest
+        {
+            Departments = r.Departments.Where(_mine.Contains).ToList(),
+            AssignedOnly = r.AssignedOnly,
+            DueOn = r.DueOn
+        };
+    }
+
+    private void CancelEdit() { _editing = null; _draft = null; _saveError = null; }
+
+    private void ToggleOutstanding(AssignmentOverviewDto r)
+    {
+        if (!_open.Remove(Key(r))) _open.Add(Key(r));
+    }
+
+    private async Task SaveAsync(AssignmentOverviewDto r)
+    {
+        if (_draft is null || _saving) return;
+        // Departments assigned by others stay assigned: send them along unchanged (the server keeps them anyway).
+        var request = new AssignmentRequest
+        {
+            Departments = [.. _draft.Departments.Concat(_locked).Distinct(StringComparer.OrdinalIgnoreCase)],
+            AssignedOnly = _draft.AssignedOnly,
+            DueOn = _draft.DueOn
+        };
+        var errors = AssignmentValidation.Validate(request);
+        if (errors.Count > 0) { _saveError = string.Join(" ", errors); return; }
+        _saving = true; _saveError = null;
+        try
+        {
+            using var response = await Http.PutAsJsonAsync($"api/assignments/{r.Kind}/{Uri.EscapeDataString(r.Id)}", request);
+            if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response);
+            _editing = null; _draft = null;
+            _status = $"Saved: {r.Title}.";
+            await LoadAsync();
+        }
+        catch (Exception ex) { _saveError = "Could not save. " + ex.Message; }
+        finally { _saving = false; }
+    }
+}

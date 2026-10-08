@@ -22,3 +22,15 @@
 
 .retention-choice { display:flex; align-items:center; gap:0.7rem; }
 .retention-choice ::deep input[type="checkbox"] { width:1.2rem; height:1.2rem; margin:0; accent-color:#ed682d; }
+
+/* Import from Excel (Main Quest 2) */
+.builder-import { border-top: 6px solid var(--prime-green); }
+.builder-upload { position: relative; overflow: hidden; }
+.builder-upload ::deep input[type=file] {
+    position: absolute !important; inset: 0; width: 100% !important; height: 100%;
+    opacity: 0; cursor: pointer; padding: 0 !important; border: 0 !important;
+}
+.builder-upload.is-busy { opacity: .6; }
+.builder-upload:focus-within { outline: 2px solid var(--muted-orange); outline-offset: 2px; }
+.builder-import-ok { color: #8fd9a8; font-size: 14px; line-height: 1.6; margin: 16px 0 0; }
+.builder-card .builder-upload { display: inline-block; margin: 0; font-size: 14px; }

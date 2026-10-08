@@ -10,7 +10,7 @@
             @foreach (var survey in Items.Where(s => s.CompletedAt is null))
             {
                 <div class="quiz-card" @key="survey.Id">
-                    <div class="quiz-info"><span class="quiz-title">@survey.Title</span><span class="quiz-meta"><span class="quiz-tag">Survey</span> @survey.QuestionCount questions</span></div>
+                    <div class="quiz-info"><span class="quiz-title">@survey.Title</span><span class="quiz-meta"><span class="quiz-tag">Survey</span> @survey.QuestionCount questions</span><RequiredBadge Required="survey.Required" DueOn="survey.DueOn" /></div>
                     <a class="quiz-start" href="@($"survey/{survey.Id}")">Open</a>
                 </div>
             }

@@ -8,6 +8,8 @@ public sealed class CreateSurveyRequest
     public string Title { get; set; } = "";
     public string Description { get; set; } = "";
     public List<SurveyQuestionDto> Questions { get; set; } = [new()];
+    /// <summary>Who has to do this survey. Null or no departments = open to everyone, nobody required.</summary>
+    public AssignmentRequest? Assignment { get; set; }
 }
 
 public sealed class SurveyQuestionDto
@@ -23,7 +25,12 @@ public sealed record SurveyDto(Guid Id, string Title, string Description,
     List<SurveyQuestionDto> Questions, DateTime CreatedAt);
 public sealed record SurveyListItemDto(Guid Id, string Title, int QuestionCount,
     DateTime CreatedAt, int ResponseCount);
-public sealed record DashboardSurveyDto(Guid Id, string Title, int QuestionCount, DateTime? CompletedAt);
+public sealed record DashboardSurveyDto(Guid Id, string Title, int QuestionCount, DateTime? CompletedAt)
+{
+    /// <summary>True when the survey is assigned to one of the user's departments.</summary>
+    public bool Required { get; init; }
+    public DateOnly? DueOn { get; init; }
+}
 public sealed record SurveyOpenDto(SurveyDto Survey, DateTime? CompletedAt, List<SurveyAnswerDto>? Answers);
 public sealed class SurveyAnswerDto
 {

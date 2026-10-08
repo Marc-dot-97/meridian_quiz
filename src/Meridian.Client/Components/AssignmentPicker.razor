@@ -1,0 +1,143 @@
+@* Main Quest 1: choose the departments that have to do a quiz or survey.
+   Departments come from the server (api/assignments/departments): everyone for SuperAdmin/HR,
+   the managed departments for a line manager. The server checks the same rules again on save. *@
+@inject HttpClient Http
+@inject IConfiguration Configuration
+
+<div class="assign-picker">
+    @if (Configuration.GetValue<bool>("Development:UseLocalMode"))
+    {
+        <p class="assign-note">Local demo: department assignments need the Meridian server and are not saved in this browser.</p>
+    }
+    else if (_loading)
+    {
+        <p class="assign-note" role="status">Loading departments…</p>
+    }
+    else if (_error is not null)
+    {
+        <p class="assign-note" role="alert">@_error <button type="button" class="assign-link" @onclick="LoadAsync">Retry</button></p>
+    }
+    else
+    {
+        <p class="assign-lead">
+            Tick the departments that have to do this @Noun. Everyone in them sees it as <strong>Required</strong>.
+            Leave everything unticked to keep it open to everyone with nobody required.
+        </p>
+        @if (_departments.Count > 8)
+        {
+            <div class="assign-tools">
+                <input type="search" class="assign-search" placeholder="Find a department" aria-label="Find a department"
+                       @bind="_filter" @bind:event="oninput" />
+                <button type="button" class="assign-link" @onclick="SelectShown">Select all shown</button>
+                <button type="button" class="assign-link" @onclick="ClearAll" disabled="@(Value.Departments.Count == 0)">Clear</button>
+            </div>
+        }
+        @if (_departments.Count == 0)
+        {
+            <p class="assign-note">No departments are linked to you yet. HR or an administrator can assign this @Noun.</p>
+        }
+        else
+        {
+            <div class="assign-grid" role="group" aria-label="@($"Departments that have to do this {Noun}")">
+                @foreach (var department in Shown)
+                {
+                    var name = department;
+                    var on = IsSelected(name);
+                    <label class="assign-chip @(on ? "is-on" : "")" @key="name">
+                        <input type="checkbox" checked="@on" @onchange="e => Toggle(name, e.Value is true)" />
+                        <span>@name</span>
+                    </label>
+                }
+                @if (!Shown.Any())
+                {
+                    <span class="assign-note">No department matches “@_filter”.</span>
+                }
+            </div>
+        }
+        @if (Locked is { Count: > 0 })
+        {
+            <p class="assign-note">
+                Also assigned by HR or another manager (you can’t change these):
+                @foreach (var d in Locked) { <span class="assign-chip is-locked">@d</span> }
+            </p>
+        }
+        <div class="assign-options">
+            <label class="assign-check">
+                <input type="checkbox" checked="@Value.AssignedOnly" disabled="@(SelectedCount == 0)"
+                       @onchange="e => { Value.AssignedOnly = e.Value is true; Changed(); }" />
+                <span>Only these departments can see this @Noun</span>
+            </label>
+            <div class="assign-due">
+                <label for="@($"assign-due-{_uid}")">Due date <span>(optional)</span></label>
+                <input id="@($"assign-due-{_uid}")" type="date" min="@DateTime.UtcNow.AddHours(2).ToString("yyyy-MM-dd")"
+                       disabled="@(SelectedCount == 0)" @bind="Value.DueOn" @bind:after="Changed" />
+            </div>
+        </div>
+        <p class="assign-summary" role="status">
+            @(SelectedCount == 0
+                ? $"Open to everyone · nobody required"
+                : $"{SelectedCount} department{(SelectedCount == 1 ? "" : "s")} required" +
+                  (Value.AssignedOnly ? " · hidden from everyone else" : " · others may take it optionally") +
+                  (Value.DueOn is DateOnly due ? $" · due {due:dd MMM yyyy}" : ""))
+        </p>
+    }
+</div>
+
+@code {
+    /// <summary>The request being edited (changed in place).</summary>
+    [Parameter, EditorRequired] public AssignmentRequest Value { get; set; } = new();
+    /// <summary>"quiz" or "survey", used in the wording.</summary>
+    [Parameter] public string Noun { get; set; } = "quiz";
+    /// <summary>Departments already assigned by someone else that this author may not change (shown read-only).</summary>
+    [Parameter] public IReadOnlyCollection<string>? Locked { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly string _uid = Guid.NewGuid().ToString("N")[..8];
+    private List<string> _departments = [];
+    private bool _loading = true;
+    private string? _error;
+    private string _filter = "";
+
+    private IEnumerable<string> Shown => string.IsNullOrWhiteSpace(_filter)
+        ? _departments
+        : _departments.Where(d => d.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase));
+    private int SelectedCount => Value.Departments.Count + (Locked?.Count ?? 0);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (Configuration.GetValue<bool>("Development:UseLocalMode")) { _loading = false; return; }
+        _loading = true; _error = null;
+        try
+        {
+            var result = await Http.GetFromJsonAsync<AssignableDepartmentsDto>("api/assignments/departments");
+            _departments = result?.Departments ?? [];
+        }
+        catch (Exception ex) { _error = "Departments could not be loaded. " + ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private bool IsSelected(string name) => Value.Departments.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    private void Toggle(string name, bool on)
+    {
+        Value.Departments.RemoveAll(d => string.Equals(d, name, StringComparison.OrdinalIgnoreCase));
+        if (on) Value.Departments.Add(name);
+        Changed();
+    }
+
+    private void SelectShown()
+    {
+        foreach (var d in Shown.Where(d => !IsSelected(d)).ToList()) Value.Departments.Add(d);
+        Changed();
+    }
+
+    private void ClearAll() { Value.Departments.Clear(); Changed(); }
+
+    private void Changed()
+    {
+        if (SelectedCount == 0) { Value.AssignedOnly = false; Value.DueOn = null; }
+        _ = OnChanged.InvokeAsync();
+    }
+}

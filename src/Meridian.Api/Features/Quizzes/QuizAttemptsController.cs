@@ -9,7 +9,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Meridian.Api.Features.Quizzes;
 
 [ApiController, Authorize, Route("api/quiz-attempts")]
-public sealed class QuizAttemptsController(MeridianDbContext db) : ControllerBase
+public sealed class QuizAttemptsController(MeridianDbContext db, Meridian.Api.Features.Assignments.AssignmentService assignments,
+    Meridian.Api.Features.Assignments.AssignmentStore assignmentStore) : ControllerBase
 {
     private ulong UserId => ulong.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     public sealed record SnapshotQuestion(QuestionDto Question, ulong CorrectOptionId);
@@ -25,6 +26,14 @@ public sealed class QuizAttemptsController(MeridianDbContext db) : ControllerBas
         var quiz = await db.Quizzes.Include(q => q.QuizQuestions).ThenInclude(q => q.Question)
             .ThenInclude(q => q.AnswerOptions).SingleOrDefaultAsync(q => q.Id == request.QuizId && q.IsActive == true);
         if (quiz == null) return NotFound(new { message = "Quiz not found." });
+        // Quizzes restricted to assigned departments can only be started by people in those departments.
+        var assignment = await assignmentStore.GetAsync(AssignmentKinds.Quiz, quiz.Id.ToString(), HttpContext.RequestAborted);
+        if (assignment.AssignedOnly)
+        {
+            var viewer = await assignments.ViewerAsync(User, HttpContext.RequestAborted);
+            if (viewer is null || !assignment.IsVisibleTo(viewer.Departments, viewer.SeesEverything))
+                return NotFound(new { message = "Quiz not found." });
+        }
         if (quiz.AvailableFrom.HasValue && !QuizAvailability.IsUnlocked(quiz.AvailableFrom.Value))
             return BadRequest(new { message = "This quiz is not available yet." });
         if (QuizAvailability.IsExpired(quiz.ExpiresAt)) return BadRequest(new { message = "This quiz has expired." });

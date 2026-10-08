@@ -10,7 +10,9 @@ namespace Meridian.Api.Features.Surveys;
 [ApiController]
 [Route("api/surveys")]
 [Authorize]
-public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Features.Reports.EmployeeDirectoryStore directory) : ControllerBase
+public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Features.Reports.EmployeeDirectoryStore directory,
+    Meridian.Api.Features.Assignments.AssignmentService assignments, Meridian.Api.Features.Assignments.AssignmentStore assignmentStore,
+    ILogger<SurveysController> logger) : ControllerBase
 {
     [HttpGet]
     [Authorize(Roles = "QuizAuthor,Admin")]
@@ -30,9 +32,28 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
     {
         var errors = SurveyValidation.Definition(request);
         if (errors.Count > 0) return BadRequest(new { message = string.Join(" ", errors) });
+        Meridian.Api.Features.Assignments.ItemAssignment? assignment = null;
+        Meridian.Api.Features.Assignments.AssignmentViewer? viewer = null;
+        if (request.Assignment is { } wanted && (wanted.Departments.Count > 0 || wanted.AssignedOnly || wanted.DueOn is not null))
+        {
+            viewer = await assignments.ViewerAsync(User, ct);
+            if (viewer is null) return Forbid();
+            var (prepared, assignmentError) = await assignments.PrepareAsync(viewer, AssignmentKinds.Survey, null, wanted, ct);
+            if (prepared is null) return BadRequest(new { message = assignmentError });
+            assignment = prepared;
+        }
         var survey = new SurveyDto(Guid.NewGuid(), request.Title.Trim(), request.Description?.Trim() ?? "", request.Questions, DateTime.UtcNow);
         db.Surveys.Add(new SurveyRecord { Id = survey.Id, Title = survey.Title, DefinitionJson = JsonSerializer.Serialize(survey), CreatedAt = survey.CreatedAt, DeleteAfter = request.AddToArchive ? survey.CreatedAt.AddMonths(24) : null });
         await db.SaveChangesAsync(ct);
+        if (assignment is not null && viewer is not null)
+        {
+            try { await assignmentStore.SaveAsync(assignment with { Id = survey.Id.ToString() }, viewer.User.Id, ct); }
+            catch (Exception ex)
+            {
+                // The survey itself is saved; the departments can be set again on the Assignments page.
+                logger.LogError(ex, "Survey {SurveyId} was saved but its department assignment was not", survey.Id);
+            }
+        }
         return StatusCode(201, survey);
     }
 
@@ -44,8 +65,21 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
         var records = await db.Surveys.AsNoTracking().OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
         var completed = await db.SurveyCompletions.AsNoTracking().Where(x => x.UserId == userId.Value)
             .ToDictionaryAsync(x => x.SurveyId, x => x.SubmittedAt, ct);
-        return records.Select(x => new DashboardSurveyDto(x.Id, x.Title, Decode(x).Questions.Count,
-            completed.TryGetValue(x.Id, out var date) ? DateTime.SpecifyKind(date, DateTimeKind.Utc) : null)).ToList();
+        var viewer = await assignments.ViewerAsync(User, ct);
+        if (viewer is null) return Forbid();
+        var assigned = await assignmentStore.GetAllAsync(AssignmentKinds.Survey, ct);
+        var result = new List<DashboardSurveyDto>();
+        foreach (var x in records)
+        {
+            var a = assigned.GetValueOrDefault(x.Id.ToString());
+            if (a is not null && !a.IsVisibleTo(viewer.Departments, viewer.SeesEverything)) continue;
+            var required = a?.IsRequiredFor(viewer.Departments) == true;
+            result.Add(new DashboardSurveyDto(x.Id, x.Title, Decode(x).Questions.Count,
+                completed.TryGetValue(x.Id, out var date) ? DateTime.SpecifyKind(date, DateTimeKind.Utc) : null)
+                { Required = required, DueOn = required ? a!.DueOn : null });
+        }
+        // Required surveys first (earliest due date first), then the rest newest first.
+        return result.OrderByDescending(x => x.Required).ThenBy(x => x.DueOn ?? DateOnly.MaxValue).ToList();
     }
 
     [HttpGet("{surveyId:guid}")]
@@ -54,7 +88,7 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
         var userId = await CurrentUserIdAsync(ct);
         if (userId is null) return Forbid();
         var survey = await db.Surveys.AsNoTracking().SingleOrDefaultAsync(x => x.Id == surveyId, ct);
-        if (survey is null) return NotFound();
+        if (survey is null || !await CanSeeAsync(surveyId, ct)) return NotFound();
         var response = await db.SurveyCompletions.AsNoTracking().SingleOrDefaultAsync(x => x.SurveyId == surveyId && x.UserId == userId.Value, ct);
         return new SurveyOpenDto(Decode(survey), response is null ? null : DateTime.SpecifyKind(response.SubmittedAt, DateTimeKind.Utc),
             response is null ? null : JsonSerializer.Deserialize<List<SurveyAnswerDto>>(response.AnswersJson));
@@ -69,7 +103,7 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
         if (await db.SurveyCompletions.AnyAsync(x => x.SurveyId == surveyId && x.UserId == userId.Value, ct))
             return NoContent(); // Retried requests do not create duplicate responses.
         var record = await db.Surveys.AsNoTracking().SingleOrDefaultAsync(x => x.Id == surveyId, ct);
-        if (record is null) return NotFound();
+        if (record is null || !await CanSeeAsync(surveyId, ct)) return NotFound();
         var errors = SurveyValidation.Answers(Decode(record), request);
         if (errors.Count > 0) return BadRequest(new { message = string.Join(" ", errors) });
         // Anonymity: participation + the user's private copy go to survey_completions; a separate,
@@ -98,6 +132,15 @@ public sealed class SurveysController(MeridianDbContext db, Meridian.Api.Feature
             throw;
         }
         return NoContent();
+    }
+
+    /// <summary>Surveys restricted to assigned departments can only be opened and answered by people in those departments.</summary>
+    private async Task<bool> CanSeeAsync(Guid surveyId, CancellationToken ct)
+    {
+        var a = await assignmentStore.GetAsync(AssignmentKinds.Survey, surveyId.ToString(), ct);
+        if (!a.AssignedOnly) return true;
+        var viewer = await assignments.ViewerAsync(User, ct);
+        return viewer is not null && a.IsVisibleTo(viewer.Departments, viewer.SeesEverything);
     }
 
     private async Task<ulong?> CurrentUserIdAsync(CancellationToken ct)

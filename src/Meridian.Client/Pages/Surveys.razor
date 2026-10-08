@@ -78,6 +78,10 @@
                 }
                 <button type="button" class="survey-add" disabled="@(Draft.Questions.Count >= 50)" @onclick="() => Draft.Questions.Add(new())">＋ Add question</button>
                 <section class="survey-card">
+                    <p class="survey-eyebrow">ASSIGN</p><h2>Who has to do this survey?</h2>
+                    <AssignmentPicker Value="Draft.Assignment!" Noun="survey" />
+                </section>
+                <section class="survey-card">
                     <label class="survey-checkbox-label"><InputCheckbox @bind-Value="Draft.AddToArchive" /><span>Add to archive</span></label>
                     <p class="survey-hint">When ticked, this survey and all its responses will be permanently deleted 24 months after creation. This is not a recoverable archive. Untick to keep it.</p>
                 </section>
@@ -91,7 +95,7 @@
 
 @code {
     private List<SurveyListItemDto> Items = [];
-    private CreateSurveyRequest Draft = new();
+    private CreateSurveyRequest Draft = new() { Assignment = new() };
     private List<string> ValidationErrors = [];
     private bool Loading = true, Busy, EditorOpen;
     private string? Error, Status;
@@ -105,18 +109,21 @@
         catch (Exception ex) { Error = "Surveys could not be loaded. " + ex.Message; }
         finally { Loading = false; ListRevision++; }
     }
-    private void OpenEditor() { Draft = new(); ValidationErrors = []; EditorOpen = true; Status = null; }
+    private void OpenEditor() { Draft = new() { Assignment = new() }; ValidationErrors = []; EditorOpen = true; Status = null; }
     private async Task SaveAsync(EditContext context)
     {
         if (Busy) return;
         ValidationErrors = SurveyValidation.Definition(Draft);
+        ValidationErrors.AddRange(AssignmentValidation.Validate(Draft.Assignment));
         if (!context.Validate() || ValidationErrors.Count > 0) return;
         Busy = true; Error = null; Status = null;
         try
         {
             await SurveysApi.CreateAsync(Draft);
             EditorOpen = false;
-            Status = "Survey saved. It is now listed on the dashboard.";
+            Status = Draft.Assignment is { Departments.Count: > 0 } a
+                ? $"Survey saved and assigned to {a.Departments.Count} department{(a.Departments.Count == 1 ? "" : "s")}. It is now listed on their dashboards."
+                : "Survey saved. It is now listed on the dashboard.";
             // Creation has already succeeded; do not leave a resubmittable form if refreshing the list fails.
             await LoadAsync();
         }

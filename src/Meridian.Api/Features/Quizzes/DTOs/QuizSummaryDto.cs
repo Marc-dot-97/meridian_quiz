@@ -16,4 +16,8 @@ public sealed class QuizSummaryDto
     public int QuestionsPerAttempt { get; set; }
 
     public decimal CpdPoints { get; set; }
+
+    public bool Required { get; set; }
+
+    public DateOnly? DueOn { get; set; }
 }

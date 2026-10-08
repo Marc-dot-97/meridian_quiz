@@ -13,6 +13,8 @@ public sealed class CreateQuizRequest
     public DateTime? AvailableFrom { get; set; }
     public DateTime? ExpiresAt { get; set; }
     public List<QuizBuilderQuestion> Questions { get; set; } = [];
+    /// <summary>Who has to do this quiz (Quest 1). Null or no departments = open to everyone, nobody required.</summary>
+    public AssignmentRequest? Assignment { get; set; }
 }
 
 public sealed class QuizBuilderQuestion
@@ -23,7 +25,11 @@ public sealed class QuizBuilderQuestion
     public int? CorrectOptionIndex { get; set; }
 }
 
-public sealed record CreatedQuizResponse(ulong Id, string Title, DateTime? AvailableFrom, DateTime? ExpiresAt = null);
+public sealed record CreatedQuizResponse(ulong Id, string Title, DateTime? AvailableFrom, DateTime? ExpiresAt = null)
+{
+    /// <summary>Set when the quiz was saved but its department assignment could not be.</summary>
+    public string? AssignmentWarning { get; init; }
+}
 public sealed record SavedLocalQuiz(ulong Id, CreateQuizRequest Definition);
 
 public static class QuizBuilderValidation
@@ -84,3 +90,12 @@ public static class QuizAvailability
     public static bool CanStart(DateTime? availableFrom, DateTime? expiresAt) => IsUnlocked(availableFrom) && !IsExpired(expiresAt);
     public static string Display(DateTime value) => AsUtc(value).AddHours(2).ToString("dd MMM yyyy 'at' HH:mm") + " SAST";
 }
+
+/// <summary>
+/// Result of reading a filled-in Meridian quiz template (Main Quest 2). The quiz is NOT saved yet:
+/// the Quiz studio shows it for checking, the author picks departments and saves it the normal way.
+/// </summary>
+public sealed record QuizImportResultDto(CreateQuizRequest Quiz, List<string> Warnings, string FileName);
+
+/// <summary>Returned with 400 when a template cannot be imported: one entry per problem cell, e.g. "Questions!C7: ...".</summary>
+public sealed record QuizImportProblemDto(string Message, List<string> Problems);

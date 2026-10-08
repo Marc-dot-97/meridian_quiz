@@ -1079,3 +1079,96 @@ button.btn-arc { border: 0; background: transparent; font-family: var(--font-bod
     58%  { opacity: 1; }
     100% { transform: rotate(0deg);   opacity: 1; }
 }
+
+/* ===== Main Quest 1 · Department assignments ===== */
+.btn-arc--assign { width: 150px; }
+
+.required-badge {
+    display: inline-flex; align-self: flex-start; align-items: center; gap: 6px;
+    margin-top: 6px; padding: 3px 10px; border-radius: 999px;
+    font-size: .68rem; font-weight: 700; letter-spacing: .04em;
+    color: var(--dark-night); background: var(--muted-orange);
+}
+.required-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--dark-night); }
+.required-badge.is-late { background: #ffb099; }
+
+/* Picker (Quiz studio, survey editor, Assignments page) */
+.assign-picker { display: flex; flex-direction: column; gap: 12px; }
+.assign-lead { margin: 0; font-size: .85rem; line-height: 1.6; color: #c9d7d8; }
+.assign-note { margin: 0; font-size: .8rem; line-height: 1.6; color: #a9bec1; }
+.assign-tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.assign-search {
+    flex: 1 1 220px; min-width: 0; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.18); background: var(--dark-night); color: var(--white); font: inherit; font-size: .9rem;
+}
+.assign-link {
+    border: 0; background: transparent; color: var(--muted-orange); font: inherit; font-size: .8rem; font-weight: 700;
+    cursor: pointer; padding: 6px 4px;
+}
+.assign-link:disabled { opacity: .4; cursor: not-allowed; }
+.assign-grid { display: flex; flex-wrap: wrap; gap: 8px; max-height: 280px; overflow-y: auto; padding: 2px; }
+.assign-chip {
+    display: inline-flex !important; align-items: center; gap: 8px; margin: 0 !important;
+    padding: 8px 12px; border-radius: 999px; cursor: pointer; user-select: none;
+    border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04);
+    font-size: .8rem !important; font-weight: 600 !important; color: var(--earth-grey);
+    transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+.assign-chip input { width: 16px !important; height: 16px; margin: 0; padding: 0 !important; accent-color: var(--muted-orange); flex-shrink: 0; }
+.assign-chip:hover { border-color: rgba(248,153,57,.6); }
+.assign-chip.is-on { background: rgba(248,153,57,.16); border-color: var(--muted-orange); color: var(--white); }
+.assign-chip.is-locked { cursor: default; margin: 4px 4px 0 0 !important; border-style: dashed; }
+.assign-chip:focus-within { outline: 2px solid var(--muted-orange); outline-offset: 2px; }
+.assign-options { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-end; }
+.assign-check { display: flex !important; align-items: center; gap: 10px; margin: 0 !important; font-weight: 600 !important; cursor: pointer; }
+.assign-check input { width: 18px !important; height: 18px; padding: 0 !important; margin: 0; accent-color: var(--muted-orange); flex-shrink: 0; }
+.assign-due label { margin: 0 0 6px !important; }
+.assign-due input { max-width: 200px; }
+.assign-picker input:disabled { opacity: .45; }
+.assign-summary { margin: 0; font-size: .78rem; color: var(--muted-orange); font-weight: 700; }
+
+/* Assignments page */
+.assign-page h2 { margin: 0 0 6px; }
+.assign-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 18px; }
+.assign-head-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.assign-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+.assign-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: rgba(8,32,36,.6); }
+.assign-tab {
+    border: 0; border-radius: 999px; padding: 8px 14px; background: transparent; color: var(--earth-grey);
+    font: inherit; font-size: .8rem; cursor: pointer;
+}
+.assign-tab.is-on { background: var(--prime-green); color: var(--white); }
+.assign-status { color: #8fd9a8; font-size: .85rem; margin: 0 0 12px; }
+.assign-list { display: flex; flex-direction: column; gap: 12px; }
+.assign-row {
+    background: rgba(8,32,36,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 16px 18px;
+}
+.assign-row.is-assigned { border-left: 3px solid var(--muted-orange); }
+.assign-row-top { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.assign-row-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.assign-row-main h3 { margin: 2px 0 0; font-size: 1rem; }
+.assign-row-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.assign-meta { margin: 0; font-size: .78rem; color: #a9bec1; line-height: 1.5; overflow-wrap: anywhere; }
+.assign-meta strong { color: var(--white); }
+.assign-due-tag { margin-left: 8px; font-size: .7rem; font-weight: 700; color: var(--muted-orange); }
+.assign-due-tag.is-late { color: #ffb099; }
+.assign-progress { height: 6px; max-width: 360px; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; }
+.assign-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #F89939, #E46434); }
+.assign-editor { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.1); display: flex; flex-direction: column; gap: 12px; }
+.assign-editor-actions { display: flex; justify-content: flex-end; gap: 12px; align-items: center; }
+.assign-editor input[type=date] {
+    padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); background: var(--dark-night);
+    color: var(--white); font: inherit; color-scheme: dark;
+}
+.assign-error { margin: 0; color: #ffd1bf; font-size: .85rem; }
+.assign-outstanding {
+    list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid rgba(255,255,255,.08);
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; max-height: 320px; overflow-y: auto;
+}
+.assign-outstanding li { display: flex; flex-direction: column; font-size: .85rem; }
+
+@media (max-width: 620px) {
+    .assign-row-top { flex-direction: column; }
+    .assign-row-actions { flex-direction: row; align-items: center; }
+    .btn-arc--assign { width: auto; flex: 1 1 auto; }
+}

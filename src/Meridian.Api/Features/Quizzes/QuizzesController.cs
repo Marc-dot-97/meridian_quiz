@@ -1,4 +1,5 @@
 using Meridian.Api.Data;
+using Meridian.Api.Features.Assignments;
 using Meridian.Api.Features.Quizzes.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,11 +13,17 @@ namespace Meridian.Api.Features.Quizzes;
 public sealed class QuizzesController : ControllerBase
 {
     private readonly MeridianDbContext _dbContext;
+    private readonly AssignmentService _assignments;
+    private readonly AssignmentStore _assignmentStore;
 
     public QuizzesController(
-        MeridianDbContext dbContext)
+        MeridianDbContext dbContext,
+        AssignmentService assignments,
+        AssignmentStore assignmentStore)
     {
         _dbContext = dbContext;
+        _assignments = assignments;
+        _assignmentStore = assignmentStore;
     }
 
 
@@ -52,7 +59,21 @@ public sealed class QuizzesController : ControllerBase
                 })
                 .ToListAsync();
 
-        return Ok(quizzes);
+        // Department assignments: "Required" for the user's departments; restricted quizzes are hidden from everyone else.
+        var viewer = await _assignments.ViewerAsync(User, HttpContext.RequestAborted);
+        if (viewer is null) return Forbid();
+        var assigned = await _assignmentStore.GetAllAsync(Meridian.Shared.DTOs.AssignmentKinds.Quiz, HttpContext.RequestAborted);
+        var visible = new List<QuizSummaryDto>();
+        foreach (var quiz in quizzes)
+        {
+            if (!assigned.TryGetValue(quiz.Id.ToString(), out var a)) { visible.Add(quiz); continue; }
+            if (!a.IsVisibleTo(viewer.Departments, viewer.SeesEverything)) continue;
+            quiz.Required = a.IsRequiredFor(viewer.Departments);
+            quiz.DueOn = quiz.Required ? a.DueOn : null;
+            visible.Add(quiz);
+        }
+
+        return Ok(visible);
     }
 
 
@@ -96,6 +117,16 @@ public sealed class QuizzesController : ControllerBase
                         q.TimeLimitMinutes
                 })
                 .FirstOrDefaultAsync();
+
+        if (quiz is not null)
+        {
+            var a = await _assignmentStore.GetAsync(Meridian.Shared.DTOs.AssignmentKinds.Quiz, quiz.Id.ToString(), HttpContext.RequestAborted);
+            if (a.AssignedOnly)
+            {
+                var viewer = await _assignments.ViewerAsync(User, HttpContext.RequestAborted);
+                if (viewer is null || !a.IsVisibleTo(viewer.Departments, viewer.SeesEverything)) quiz = null;
+            }
+        }
 
         if (quiz is null)
         {

@@ -112,6 +112,10 @@ var directoryOptions = new Meridian.Api.Features.Reports.DirectorySourceOptions(
 var directoryStore = new Meridian.Api.Features.Reports.EmployeeDirectoryStore(connectionString, directoryOptions);
 builder.Services.AddSingleton(directoryStore);
 builder.Services.AddScoped<Meridian.Api.Features.Reports.ReportAccessService>();
+// Department assignments for quizzes and surveys (who has to do what).
+var assignmentStore = new Meridian.Api.Features.Assignments.AssignmentStore(connectionString);
+builder.Services.AddSingleton(assignmentStore);
+builder.Services.AddScoped<Meridian.Api.Features.Assignments.AssignmentService>();
 PdfSharp.Fonts.GlobalFontSettings.FontResolver = new Meridian.Api.Features.Reports.MeridianFontResolver();
 if (builder.Environment.IsProduction())
 {
@@ -133,7 +137,9 @@ await using (var scope = app.Services.CreateAsyncScope())
     // Survey anonymity: split table + one-off copy of existing responses (idempotent).
     await Meridian.Api.Features.Surveys.SurveyAnonymity.EnsureSchemaAsync(connectionString);
     await Meridian.Api.Features.Surveys.SurveyAnonymity.BackfillAsync(db, directoryStore, app.Logger);
+    await assignmentStore.EnsureSchemaAsync();
     await Meridian.Api.Features.Retention.RetentionMaintenance.CleanupAsync(connectionString, app.Logger, CancellationToken.None);
+    await assignmentStore.DeleteOrphansAsync();
     // DEV SEED from the command line: dotnet run --launch-profile https -- --seed   (or --seed-reset / --seed-clear)
     if (args.Any(x => x is "--seed" or "--seed-reset" or "--seed-clear"))
     {
