@@ -7,7 +7,7 @@
 
 <div class="survey-ui surveys-page">
     <header class="survey-header">
-        <div><BrandMark Page="Surveys" /><p class="survey-eyebrow">MERIDIAN · FEEDBACK</p><h1>Surveys</h1><p>Create surveys for people to open from their dashboard.</p></div>
+        <div><BrandMark Page="Surveys" /><p class="survey-eyebrow">MERIDIAN · FEEDBACK</p><h1>Surveys</h1><p>Answer the surveys waiting for you, or create one for your team.</p></div>
         @if (!EditorOpen) { <button type="button" class="survey-primary" disabled="@(Busy || Loading)" @onclick="OpenEditor">＋ Create survey</button> }
     </header>
     @if (Configuration.GetValue<bool>("Development:UseLocalMode"))
@@ -16,6 +16,10 @@
     }
     @if (!string.IsNullOrWhiteSpace(Error)) { <div class="survey-errors" role="alert">@Error <button type="button" class="survey-text-button" @onclick="LoadAsync" disabled="@Busy">Retry loading</button></div> }
     @if (!string.IsNullOrWhiteSpace(Status)) { <p class="survey-status" role="status">@Status</p> }
+
+    <div class="surveys-todo">
+        <DashboardSurveys Heading="Waiting for you" ShowManageLink="false" />
+    </div>
 
     <section class="survey-card">
         <div class="survey-section-heading"><h2>Created surveys</h2><span>@Items.Count saved</span></div>

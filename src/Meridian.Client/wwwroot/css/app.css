@@ -962,7 +962,7 @@ a.brand-page:hover { color: var(--muted-orange); }
    behind; the goo filter (MainLayout) melts them together; a squish settles it on arrival. */
 .bottom-nav {
     --nav-x: 0px;
-    display: grid; grid-template-columns: repeat(3, 96px); gap: 0;
+    display: grid; grid-template-columns: repeat(4, var(--nav-w, 96px)); gap: 0;
     padding: 6px; bottom: 16px;
     background: rgba(8, 32, 36, .42);
     border: 1px solid rgba(255, 255, 255, .14);
@@ -970,8 +970,10 @@ a.brand-page:hover { color: var(--muted-orange); }
     -webkit-backdrop-filter: blur(18px) saturate(160%);
     backdrop-filter: blur(18px) saturate(160%);
 }
-.bottom-nav:has(a:nth-of-type(2).active) { --nav-x: 96px; }
-.bottom-nav:has(a:nth-of-type(3).active) { --nav-x: 192px; }
+.bottom-nav:has(a:nth-of-type(2).active) { --nav-x: calc(var(--nav-w, 96px) * 1); }
+.bottom-nav:has(a:nth-of-type(3).active) { --nav-x: calc(var(--nav-w, 96px) * 2); }
+.bottom-nav:has(a:nth-of-type(4).active) { --nav-x: calc(var(--nav-w, 96px) * 3); }
+@media (max-width: 420px) { .bottom-nav { --nav-w: 82px; } }
 
 .bottom-nav a {
     position: relative; z-index: 2;
@@ -985,7 +987,7 @@ a.brand-page:hover { color: var(--muted-orange); }
 
 .nav-liquid { position: absolute; inset: 0; z-index: 0; filter: url(#nav-goo); pointer-events: none; }
 .nav-drop {
-    position: absolute; top: 6px; left: 6px; width: 96px; height: 36px;
+    position: absolute; top: 6px; left: 6px; width: var(--nav-w, 96px); height: 36px;
     border-radius: 999px; background: #3A707A;
     translate: var(--nav-x) 0;
     transition: translate .55s cubic-bezier(.65, 0, .35, 1), opacity .3s ease;
@@ -995,7 +997,7 @@ a.brand-page:hover { color: var(--muted-orange); }
     transition: translate .8s cubic-bezier(.5, 0, .25, 1) .07s, opacity .3s ease;
 }
 .nav-glass-pill {                       /* glassy highlight riding on the lead drop */
-    position: absolute; top: 6px; left: 6px; width: 96px; height: 36px; z-index: 1;
+    position: absolute; top: 6px; left: 6px; width: var(--nav-w, 96px); height: 36px; z-index: 1;
     border-radius: 999px;
     background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 60%);
     border: 1px solid rgba(255, 255, 255, .24);
@@ -1008,9 +1010,11 @@ a.brand-page:hover { color: var(--muted-orange); }
 .bottom-nav:has(a:nth-of-type(1).active) :is(.nav-drop:not(.nav-drop--tail), .nav-glass-pill) { animation: nav-drop-1 .7s cubic-bezier(.3, .7, .4, 1); }
 .bottom-nav:has(a:nth-of-type(2).active) :is(.nav-drop:not(.nav-drop--tail), .nav-glass-pill) { animation: nav-drop-2 .7s cubic-bezier(.3, .7, .4, 1); }
 .bottom-nav:has(a:nth-of-type(3).active) :is(.nav-drop:not(.nav-drop--tail), .nav-glass-pill) { animation: nav-drop-3 .7s cubic-bezier(.3, .7, .4, 1); }
+.bottom-nav:has(a:nth-of-type(4).active) :is(.nav-drop:not(.nav-drop--tail), .nav-glass-pill) { animation: nav-drop-4 .7s cubic-bezier(.3, .7, .4, 1); }
 @keyframes nav-drop-1 { 0% { scale: 1 1; } 35% { scale: 1.32 .80; } 62% { scale: .93 1.08; } 82% { scale: 1.03 .98; } 100% { scale: 1 1; } }
 @keyframes nav-drop-2 { 0% { scale: 1 1; } 35% { scale: 1.32 .80; } 62% { scale: .93 1.08; } 82% { scale: 1.03 .98; } 100% { scale: 1 1; } }
 @keyframes nav-drop-3 { 0% { scale: 1 1; } 35% { scale: 1.32 .80; } 62% { scale: .93 1.08; } 82% { scale: 1.03 .98; } 100% { scale: 1 1; } }
+@keyframes nav-drop-4 { 0% { scale: 1 1; } 35% { scale: 1.32 .80; } 62% { scale: .93 1.08; } 82% { scale: 1.03 .98; } 100% { scale: 1 1; } }
 
 .bottom-nav:not(:has(a.active)) :is(.nav-drop, .nav-glass-pill) { opacity: 0; }   /* e.g. Leaderboard */
 /* Browsers without :has() keep a static highlight on the active link. */
@@ -1172,3 +1176,7 @@ button.btn-arc { border: 0; background: transparent; font-family: var(--font-bod
     .assign-row-actions { flex-direction: row; align-items: center; }
     .btn-arc--assign { width: auto; flex: 1 1 auto; }
 }
+
+/* Surveys page: the surveys waiting for the user, above the ones they created. */
+.surveys-todo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin: 8px 0 24px; }
+@media (max-width: 760px) { .surveys-todo { grid-template-columns: 1fr; } }

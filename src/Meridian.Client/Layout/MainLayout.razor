@@ -3,6 +3,13 @@
 @inject NavigationManager Navigation
 
 <div class="app-shell">
+    @* Frost trial (css/frost.css): drifting glows, aurora band and grain behind the frosted tiles. *@
+    <div class="app-frost-bg" aria-hidden="true">
+        <span class="frost-orb frost-orb--1"></span>
+        <span class="frost-orb frost-orb--2"></span>
+        <span class="frost-aurora"></span>
+        <svg class="frost-grain" focusable="false"><filter id="frost-noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" /></filter><rect width="100%" height="100%" filter="url(#frost-noise)" /></svg>
+    </div>
     @* Login-page arc, carried across every signed-in page. *@
     <svg class="app-ambient-arc" viewBox="0 0 200 110" aria-hidden="true" focusable="false">
         <path d="M10,100 A90,90 0 0 1 190,100" fill="none" stroke="#F89939" stroke-width="0.5" />
@@ -19,6 +26,10 @@
         @Body
     </div>
     <nav class="bottom-nav" aria-label="Primary navigation">
+        @* Liquid glass trial (css/frost.css): refracting body, tint and specular rim under the links. *@
+        <span class="nav-lg nav-lg-refract" aria-hidden="true"></span>
+        <span class="nav-lg nav-lg-tint" aria-hidden="true"></span>
+        <span class="nav-lg nav-lg-rim" aria-hidden="true"></span>
         @* Liquid indicator: two blobs merged by the goo filter, plus a glass highlight on top. *@
         <span class="nav-liquid" aria-hidden="true">
             <span class="nav-drop"></span>
@@ -27,6 +38,7 @@
         <span class="nav-glass-pill" aria-hidden="true"></span>
         <NavLink href="/" Match="NavLinkMatch.All">Home</NavLink>
         <NavLink href="quizzes">Quizzes</NavLink>
+        <NavLink href="surveys">Surveys</NavLink>
         <NavLink href="reports">Reports</NavLink>
         
     </nav>
@@ -37,6 +49,14 @@
                 <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8" result="goo" />
                 <feComposite in="SourceGraphic" in2="goo" operator="atop" />
             </filter>
+            @* Liquid glass: slowly drifting turbulence displaces what is seen through the nav ("organic fluidity"). *@
+            <filter id="nav-liquid-glass" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.008 0.016" numOctaves="2" seed="7" result="noise">
+                    <animate attributeName="baseFrequency" dur="18s" values="0.008 0.016;0.011 0.020;0.008 0.016" repeatCount="indefinite" />
+                </feTurbulence>
+                <feGaussianBlur in="noise" stdDeviation="2" result="soft" />
+                <feDisplacementMap in="SourceGraphic" in2="soft" scale="46" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
         </defs>
     </svg>
 </div>
@@ -45,9 +65,9 @@
     private string _pageKey = "";
     private string _sunClass = "";           // "" = first load (sunrise only); else a full set-and-rise cycle
 
-    // Nav order decides which way the sun travels: moving right (Home → Quizzes → Reports)
+    // Nav order decides which way the sun travels: moving right (Home → Quizzes → Surveys → Reports)
     // it sets on the right and rises again from the left; moving left it goes the other way.
-    private static readonly string[] NavOrder = ["", "/quizzes", "/reports"];
+    private static readonly string[] NavOrder = ["", "/quizzes", "/surveys", "/reports"];
 
     protected override void OnInitialized()
     {

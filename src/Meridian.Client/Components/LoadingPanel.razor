@@ -1,2 +1,6 @@
-<div class="loading-panel"><div class="spinner"></div><p>@Message</p></div>
+@* Skeleton placeholder in the shape of the content that is loading (styles: css/frost.css). *@
+<div class="loading-panel" role="status" aria-live="polite">
+    <div class="skel-stack" aria-hidden="true"><span class="skel skel--title"></span><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+    <p class="loading-text">@Message</p>
+</div>
 @code { [Parameter] public string Message { get; set; } = "Loading..."; }
