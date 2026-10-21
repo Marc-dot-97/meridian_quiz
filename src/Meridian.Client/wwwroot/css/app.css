@@ -61,12 +61,21 @@ button, input { font: inherit; }
   .leaderboard-row > strong:last-child { grid-column:2; }
 }
 
-/* Dashboard progress gauge. */
-.arc-card .arc-svg {
-    width: 65%;
-    max-width: 380px;
-    margin: 0 auto;
+/* Dashboard progress gauge: a large arch with the rank and points inside its bowl,
+   and "Dawn" / "Meridian" directly under its two ends (no empty space between). */
+.arc-card { display: flex; flex-direction: column; align-items: center; }
+.arc-stage { position: relative; width: min(100%, 540px); }
+.arc-card .arc-svg { width: 100%; max-width: none; margin: 0; overflow: visible; }
+.arc-readout {
+    position: absolute; left: 18%; right: 18%; bottom: 6%;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
 }
+.arc-readout .arc-rank { margin: 0; }
+.arc-readout .rank-monthly-xp { margin: 0; font-size: .8rem; color: var(--white); opacity: .85; }
+.arc-readout .arc-stat { margin: 2px 0 0; }
+/* The arch's ends sit 10% in from each side of the drawing (x 20 and 180 of 200). */
+.arc-card .arc-labels { width: min(100%, 540px); margin-top: 2px; }
+.arc-card .arc-labels span { width: 20%; text-align: center; }
 
 /* Quiz availability + completed quiz dashboard sections. */
 .dashboard-section-link {
@@ -153,9 +162,9 @@ button, input { font: inherit; }
 }
 
 @media (max-width: 620px) {
-    .arc-card .arc-svg {
-        width: 82%;
-    }
+    .arc-readout { left: 14%; right: 14%; bottom: 4%; gap: 2px; }
+    .arc-readout .arc-rank { font-size: .95rem; }
+    .arc-readout .rank-monthly-xp, .arc-readout .arc-stat { font-size: .7rem; }
 
     .completed-result {
         min-width: 68px;
@@ -1178,5 +1187,14 @@ button.btn-arc { border: 0; background: transparent; font-family: var(--font-bod
 }
 
 /* Surveys page: the surveys waiting for the user, above the ones they created. */
-.surveys-todo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin: 8px 0 24px; }
+.surveys-todo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; margin: 8px 0 24px; }
+/* Same section headings as the dashboard (survey-ui makes h2 large), and both columns start on one line. */
+.surveys-todo .block { margin: 0; }
+.surveys-todo .dashboard-section-link { margin: 0; min-height: 22px; }
+.survey-ui .surveys-todo h2 { font-family: var(--font-display); font-size: .75rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted-orange); margin: 0 0 14px; line-height: 22px; }
+.survey-ui .surveys-todo .dashboard-section-link h2 { margin: 0; }
+.surveys-todo .dashboard-section-link + * { margin-top: 14px; }
 @media (max-width: 760px) { .surveys-todo { grid-template-columns: 1fr; } }
+
+/* Blazor's FocusOnNavigate puts focus on each page's <h1> for screen readers; it must not draw a focus box. */
+h1:focus, [tabindex="-1"]:focus { outline: none; }
