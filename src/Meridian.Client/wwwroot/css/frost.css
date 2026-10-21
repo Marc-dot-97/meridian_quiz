@@ -61,16 +61,20 @@
     pointer-events: none;
 }
 
-/* Passing light: a soft band sweeps across each pane every 9s, one after another. */
+/* Passing light: a soft band sweeps across each pane every 9s, one after another.
+   The layer covers exactly the pane (inset 0) and only its background moves, so no layer edge ever
+   sits inside a pane. (The first version slid an oversized layer and parked it at ~72% of the width,
+   which showed as a straight vertical line on every tile.) */
 :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::after {
-    content: ''; position: absolute; inset: -20% -60%;
-    background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, .07) 48%, rgba(248, 153, 57, .12) 50%, rgba(255, 255, 255, .07) 52%, transparent 58%);
-    transform: translateX(-60%);
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .07) 47%, rgba(248, 153, 57, .12) 50%, rgba(255, 255, 255, .07) 53%, transparent 60%) no-repeat;
+    background-size: 300% 100%;
+    background-position: 100% 0;
     animation: frost-pass 9s cubic-bezier(.45, 0, .2, 1) infinite;
     animation-delay: var(--frost-d, 0s);
     pointer-events: none;
 }
-@keyframes frost-pass { 0% { transform: translateX(-60%); } 22%, 100% { transform: translateX(60%); } }
+@keyframes frost-pass { 0% { background-position: 100% 0; } 22%, 100% { background-position: 0% 0; } }
 
 /* Reading order for the sweep (left column first, then right). */
 .dash-progress-col .arc-card { --frost-d: .35s; }
