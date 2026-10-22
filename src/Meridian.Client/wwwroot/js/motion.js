@@ -86,7 +86,10 @@
 
     // Liquid Glass: the specular highlight follows the pointer across glass tiles and controls.
     // Mouse/trackpad only; one style write per frame; the light eases back to rest on leave.
-    var GLASS = '.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card, .btn-arc, .quiz-start, .streak-pill, .bottom-nav';
+    var GLASS = ['.arc-card', '.chart-card', '.quiz-card', '.empty-completed', '.encounter-card', '.btn-arc', '.quiz-start', '.streak-pill', '.bottom-nav',
+        '.survey-card', '.builder-card', '.leaderboard-row', '.leaderboard-empty', '.assign-row', '.survey-primary', '.survey-secondary', '.survey-add', '.builder-primary',
+        '.builder-secondary', '.builder-add-question', '.report-quick button', '.report-segment button', '.assign-chip', '.leaderboard-month-card',
+        '.assign-tabs', '.encounter-option', '.survey-choice'].join(',');
     var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
     var lit = null, px = 0, py = 0, lightQueued = false;
     function light() {
