@@ -2,7 +2,8 @@
    Principles (after the Audi "Functional Animation" guidance):
    - Show: cards in the viewport rise in bottom-to-top with a short stagger; cards below the fold
      appear only when scrolled into view; every card animates once.
-   - Performance: decorative light sweeps pause while a card is off screen or the tab is hidden;
+   - Liquid Glass: the specular highlight follows the mouse over glass tiles and controls.
+   - Performance: decorative motion pauses while a card is off screen or the tab is hidden;
      weaker devices and small screens get a lighter "lite" tier (set in index.html <head>).
    - Nothing here changes layout or content, and with reduced motion everything shows at once. */
 (function () {
@@ -82,6 +83,34 @@
         }
     }).observe(document.body, { childList: true, subtree: true });
     scan(document.body);
+
+    // Liquid Glass: the specular highlight follows the pointer across glass tiles and controls.
+    // Mouse/trackpad only; one style write per frame; the light eases back to rest on leave.
+    var GLASS = '.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card, .btn-arc, .quiz-start, .streak-pill, .bottom-nav';
+    var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+    var lit = null, px = 0, py = 0, lightQueued = false;
+    function light() {
+        lightQueued = false;
+        if (!lit) return;
+        var r = lit.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        lit.style.setProperty('--lg-x', Math.max(0, Math.min(100, (px - r.left) / r.width * 100)).toFixed(1) + '%');
+        lit.style.setProperty('--lg-y', Math.max(0, Math.min(100, (py - r.top) / r.height * 100)).toFixed(1) + '%');
+    }
+    document.addEventListener('pointermove', function (e) {
+        if (e.pointerType !== 'mouse' || reduce.matches || !fine.matches || root.classList.contains('mx-lite')) return;
+        var t = e.target.closest ? e.target.closest(GLASS) : null;
+        if (t !== lit) {
+            if (lit) { lit.style.removeProperty('--lg-x'); lit.style.removeProperty('--lg-y'); }
+            lit = t;
+        }
+        if (!lit) return;
+        px = e.clientX; py = e.clientY;
+        if (!lightQueued) { lightQueued = true; requestAnimationFrame(light); }
+    }, { passive: true });
+    document.addEventListener('pointerleave', function () {
+        if (lit) { lit.style.removeProperty('--lg-x'); lit.style.removeProperty('--lg-y'); lit = null; }
+    });
 
     // Pause all decorative motion while the tab is in the background.
     document.addEventListener('visibilitychange', function () {

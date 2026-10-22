@@ -1,5 +1,5 @@
 /* =====================================================================
-   Frost & passing light (design canvas "Meridian Style Elevation", B2)
+   Liquid Glass (was: Frost & passing light, design canvas B2)
    Localhost trial: restyles the existing tiles only. No layout changes.
    Remove the <link> to this file in index.html to switch it off.
    The sun on the background arc (MainLayout + app.css) is untouched.
@@ -34,86 +34,184 @@
 @keyframes frost-aurora { to { transform: skewY(-3deg) translate(80px, 60px); } }
 .frost-grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .06; mix-blend-mode: overlay; }
 
-/* ---------- The frosted pane ---------- */
+/* =====================================================================
+   Liquid Glass (after Apple's "Adopting Liquid Glass" and HIG "Materials")
+   Two layers, as Apple separates them:
+   - Content tiles use a clear glass MATERIAL: lighter, clearer blur with vibrancy, a lensed rim
+     and a specular highlight that follows the pointer. No 3D tilt; they lift slightly instead.
+   - Controls (header buttons, Start/Open, the streak chip and the bottom nav) are the floating
+     LIQUID GLASS layer: capsule shapes, brighter specular rim, tinted when they are the main action,
+     and a springy morph on hover/press.
+   js/motion.js feeds the pointer position into --lg-x / --lg-y. Without JS the light rests top-left.
+   ===================================================================== */
+@property --lg-x { syntax: '<percentage>'; inherits: true; initial-value: 28%; }
+@property --lg-y { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
+:root {
+    --lg-spring: cubic-bezier(.34, 1.56, .64, 1);          /* small overshoot, like a glass droplet settling */
+    --lg-rim:
+        inset 0 0 0 .5px rgba(255, 255, 255, .16),           /* hairline edge */
+        inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .42),  /* light catching the top-left lens edge */
+        inset -1px -1px 0 -.5px rgba(255, 255, 255, .12),    /* faint return on the bottom-right */
+        inset 0 0 22px rgba(255, 255, 255, .045);            /* body glow (thickness) */
+}
+
+/* ---------- Content tiles: clear glass material ---------- */
 .arc-card,
 .chart-card,
 .quiz-card,
 .empty-completed,
-.encounter-card,
-.streak-pill {
+.encounter-card {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(180deg, rgba(251, 251, 249, .07), rgba(21, 55, 65, .30) 38%, rgba(8, 32, 36, .40));
-    border: 1px solid rgba(255, 255, 255, .10);
-    -webkit-backdrop-filter: blur(var(--frost-blur)) saturate(160%);
-    backdrop-filter: blur(var(--frost-blur)) saturate(160%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), inset 0 -1px 0 rgba(0, 0, 0, .25), 0 30px 60px -30px rgba(0, 0, 0, .75);
-    transition: transform var(--mx-slow) var(--mx-ease-out), box-shadow var(--mx-slow) ease, border-color var(--mx-slow) ease, background var(--mx-slow) ease, scale var(--mx-fast) ease;
+    background: linear-gradient(160deg, rgba(251, 251, 249, .09) 0%, rgba(251, 251, 249, .03) 34%, rgba(21, 55, 65, .22) 70%, rgba(8, 32, 36, .30) 100%);
+    border: 1px solid transparent;
+    -webkit-backdrop-filter: blur(var(--frost-blur)) saturate(185%) brightness(1.06);
+    backdrop-filter: blur(var(--frost-blur)) saturate(185%) brightness(1.06);
+    box-shadow: var(--lg-rim), 0 24px 48px -28px rgba(0, 0, 0, .7);
+    transition: translate var(--mx-slow) var(--lg-spring), box-shadow var(--mx-slow) ease, background var(--mx-slow) ease, scale var(--mx-fast) ease, --lg-x .35s ease-out, --lg-y .35s ease-out;
     contain: paint;
 }
-.streak-pill { border-color: rgba(228, 100, 52, .35); }
-.empty-completed { opacity: 1; color: rgba(215, 221, 224, .75); }
+.empty-completed { opacity: 1; color: rgba(215, 221, 224, .78); }
 
-/* Specular highlight along the top edge. */
+/* Lens edge: a bright arc along the top that fades down the sides, like light bending at a glass edge. */
 :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::before {
-    content: ''; position: absolute; left: 8%; right: 8%; top: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+    content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .10) 30%, rgba(255, 255, 255, 0) 55%, rgba(248, 153, 57, .18) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
     pointer-events: none;
 }
 
-/* Passing light: a soft band sweeps across each pane every 9s, one after another.
-   The layer covers exactly the pane (inset 0) and only its background moves, so no layer edge ever
-   sits inside a pane. (The first version slid an oversized layer and parked it at ~72% of the width,
-   which showed as a straight vertical line on every tile.) */
+/* Specular highlight: rests softly top-left, follows the pointer while hovered. Covers the pane
+   exactly (inset 0) and only its gradient moves, so no seam can appear. */
 :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::after {
     content: ''; position: absolute; inset: 0; border-radius: inherit;
-    background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .07) 47%, rgba(248, 153, 57, .12) 50%, rgba(255, 255, 255, .07) 53%, transparent 60%) no-repeat;
-    background-size: 300% 100%;
-    background-position: 100% 0;
-    animation: frost-pass 9s cubic-bezier(.45, 0, .2, 1) infinite;
-    animation-delay: var(--frost-d, 0s);
+    background: radial-gradient(circle at var(--lg-x) var(--lg-y), rgba(255, 255, 255, .10), rgba(255, 255, 255, .035) 22%, rgba(255, 255, 255, 0) 48%);
+    opacity: .7;
+    transition: opacity var(--mx-slow) ease;
     pointer-events: none;
 }
-@keyframes frost-pass { 0% { background-position: 100% 0; } 22%, 100% { background-position: 0% 0; } }
 
-/* Reading order for the sweep (left column first, then right). */
-.dash-progress-col .arc-card { --frost-d: .35s; }
-.dash-quizzes-col .quiz-card:nth-child(1), .dash-quizzes-col .empty-completed { --frost-d: .7s; }
-.dash-quizzes-col .quiz-card:nth-child(2) { --frost-d: .85s; }
-.dash-quizzes-col .quiz-card:nth-child(3) { --frost-d: 1s; }
-.completed-quizzes-block .quiz-card, .completed-quizzes-block .empty-completed { --frost-d: 1.15s; }
-.dash-chart-col .chart-card { --frost-d: 1.4s; }
-.dash-surveys-col .quiz-card, .dash-surveys-col .empty-completed { --frost-d: 1.75s; }
-.dash-surveys-col .completed-surveys-block :is(.quiz-card, .empty-completed) { --frost-d: 2.1s; }
-
-/* Hover (mouse/trackpad only) and keyboard focus: the pane lifts and tilts a touch, rim warms.
-   Touch screens get a quick press instead (below), so nothing "sticks" after a tap. */
 @media (hover: hover) and (pointer: fine) {
     :is(.arc-card, .chart-card, .quiz-card):hover {
-        transform: perspective(1000px) rotateX(1.6deg) translateY(-4px);
-        border-color: rgba(248, 153, 57, .32);
-        background: linear-gradient(180deg, rgba(251, 251, 249, .10), rgba(21, 55, 65, .36) 38%, rgba(8, 32, 36, .42));
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(0, 0, 0, .25), 0 40px 64px -30px rgba(0, 0, 0, .8), 0 0 0 1px rgba(248, 153, 57, .10);
+        translate: 0 -3px;
+        background: linear-gradient(160deg, rgba(251, 251, 249, .12) 0%, rgba(251, 251, 249, .04) 34%, rgba(21, 55, 65, .24) 70%, rgba(8, 32, 36, .32) 100%);
+        box-shadow: var(--lg-rim), inset 0 0 0 1px rgba(248, 153, 57, .16), 0 34px 60px -30px rgba(0, 0, 0, .8);
     }
+    :is(.arc-card, .chart-card, .quiz-card):hover::after { opacity: 1; }
+    .quiz-card.locked:hover { translate: none; }
 }
 .quiz-card-link:focus-visible {
     outline: none;
-    transform: translateY(-3px);
-    border-color: var(--muted-orange);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 0 3px rgba(248, 153, 57, .35), 0 30px 60px -30px rgba(0, 0, 0, .75);
+    translate: 0 -3px;
+    box-shadow: var(--lg-rim), 0 0 0 3px rgba(248, 153, 57, .45), 0 30px 60px -30px rgba(0, 0, 0, .75);
 }
-@media (hover: hover) and (pointer: fine) { .quiz-card.locked:hover { transform: none; } }
 
-/* Bars glow softly through the frost. */
+/* Bars glow softly through the glass. */
 .chart-card .bar { box-shadow: 0 0 16px -4px rgba(248, 153, 57, .6); }
 
-/* Header buttons: frosted resting fill (the line-sweep hover stays as it is). */
-.btn-arc:not(.btn-arc--primary)::after {
-    background: linear-gradient(180deg, rgba(251, 251, 249, .10), rgba(21, 55, 65, .35));
-    border-color: rgba(255, 255, 255, .14);
-    -webkit-backdrop-filter: blur(14px) saturate(150%);
-    backdrop-filter: blur(14px) saturate(150%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16);
+/* ---------- Controls: Liquid Glass ---------- */
+.btn-arc, .quiz-start, .streak-pill {
+    transition: color .3s ease, scale var(--mx-base) var(--lg-spring), translate var(--mx-base) var(--lg-spring), box-shadow var(--mx-base) ease, background var(--mx-base) ease, --lg-x .25s ease-out, --lg-y .25s ease-out;
+}
+
+/* Header buttons (same widths as before). The glass lives on ::after, the old line-sweep
+   rules (::before) are retired; hover is now a light swell plus the letter spread. */
+.btn-arc::after {
+    border-radius: 999px;
+    border: 0;
+    background:
+        radial-gradient(120% 140% at var(--lg-x) var(--lg-y), rgba(255, 255, 255, .26), rgba(255, 255, 255, 0) 55%),
+        linear-gradient(180deg, rgba(251, 251, 249, .14), rgba(251, 251, 249, .04) 50%, rgba(21, 55, 65, .30));
+    -webkit-backdrop-filter: blur(10px) saturate(190%) brightness(1.08);
+    backdrop-filter: blur(10px) saturate(190%) brightness(1.08);
+    box-shadow:
+        inset 0 0 0 .5px rgba(255, 255, 255, .28),
+        inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .6),
+        inset -1px -1.5px 0 -.5px rgba(255, 255, 255, .18),
+        inset 0 -8px 14px -10px rgba(255, 255, 255, .25),
+        0 8px 18px -10px rgba(0, 0, 0, .55);
+}
+.btn-arc::before { display: none; }
+.btn-arc:hover::after, .btn-arc:focus-visible::after { opacity: 1; transform: none; }
+.btn-arc span { text-shadow: 0 1px 2px rgba(8, 32, 36, .45); }
+@media (hover: hover) and (pointer: fine) {
+    .btn-arc:hover { scale: 1.04; }
+    .btn-arc:hover::after {
+        box-shadow:
+            inset 0 0 0 .5px rgba(255, 255, 255, .36),
+            inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .75),
+            inset -1px -1.5px 0 -.5px rgba(255, 255, 255, .24),
+            inset 0 -8px 14px -10px rgba(255, 255, 255, .32),
+            0 12px 24px -12px rgba(0, 0, 0, .6);
+    }
+}
+.btn-arc:focus-visible::after { box-shadow: inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .6), 0 0 0 3px rgba(248, 153, 57, .5); }
+
+/* Tinted glass for the main action (Export): orange glass, dark text stays readable. */
+.btn-arc--primary, .btn-arc--primary:hover, .btn-arc--primary:focus-visible { color: var(--dark-night); }
+.btn-arc--primary span { text-shadow: 0 1px 0 rgba(255, 255, 255, .25); }
+.btn-arc--primary::after {
+    background:
+        radial-gradient(120% 140% at var(--lg-x) var(--lg-y), rgba(255, 255, 255, .45), rgba(255, 255, 255, 0) 55%),
+        linear-gradient(180deg, rgba(248, 153, 57, .96), rgba(228, 100, 52, .92));
+    box-shadow:
+        inset 0 0 0 .5px rgba(255, 255, 255, .35),
+        inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .7),
+        inset -1px -1.5px 0 -.5px rgba(120, 40, 10, .35),
+        0 10px 22px -10px rgba(228, 100, 52, .7);
+}
+
+/* Start / Open / Unlocked: tinted capsule. */
+.quiz-start {
+    border-radius: 999px;
+    background:
+        radial-gradient(120% 160% at var(--lg-x) var(--lg-y), rgba(255, 255, 255, .34), rgba(255, 255, 255, 0) 55%),
+        linear-gradient(180deg, rgba(240, 126, 64, .95), rgba(214, 88, 42, .95));
+    -webkit-backdrop-filter: blur(8px) saturate(180%);
+    backdrop-filter: blur(8px) saturate(180%);
+    box-shadow:
+        inset 0 0 0 .5px rgba(255, 255, 255, .3),
+        inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .6),
+        inset -1px -1.5px 0 -.5px rgba(120, 40, 10, .3),
+        0 8px 18px -10px rgba(228, 100, 52, .75);
+    text-shadow: 0 1px 1px rgba(90, 30, 8, .35);
+}
+.quiz-start:hover,
+.quiz-card-link:hover .quiz-start {
+    background:
+        radial-gradient(120% 160% at var(--lg-x) var(--lg-y), rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 55%),
+        linear-gradient(180deg, rgba(248, 146, 70, .97), rgba(228, 100, 52, .97));
+}
+@media (hover: hover) and (pointer: fine) {
+    .quiz-start:not(.quiz-locked):not(:disabled):hover, .quiz-card-link:hover .quiz-start:not(.quiz-locked) { scale: 1.05; }
+}
+.quiz-start.quiz-locked, .quiz-start:disabled {
+    background: linear-gradient(180deg, rgba(251, 251, 249, .12), rgba(21, 55, 65, .3));
+    box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .2), inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .35);
+    text-shadow: none;
+}
+
+/* Streak chip: clear glass capsule with a warm rim. */
+.streak-pill {
+    position: relative;
+    background:
+        radial-gradient(120% 160% at var(--lg-x) var(--lg-y), rgba(255, 255, 255, .20), rgba(255, 255, 255, 0) 55%),
+        linear-gradient(180deg, rgba(251, 251, 249, .12), rgba(21, 55, 65, .28));
+    border: 1px solid transparent;
+    -webkit-backdrop-filter: blur(12px) saturate(190%) brightness(1.06);
+    backdrop-filter: blur(12px) saturate(190%) brightness(1.06);
+    box-shadow:
+        inset 0 0 0 .5px rgba(248, 153, 57, .45),
+        inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .5),
+        inset -1px -1.5px 0 -.5px rgba(255, 255, 255, .14),
+        0 10px 22px -12px rgba(0, 0, 0, .6);
+}
+/* The streak glow keeps pulsing, now with the glass rim included so the pulse doesn't wipe it. */
+.streak-pill.active { animation: lg-streak 2.2s ease-in-out infinite; }
+@keyframes lg-streak {
+    0%, 100% { box-shadow: inset 0 0 0 .5px rgba(248, 153, 57, .45), inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .5), inset -1px -1.5px 0 -.5px rgba(255, 255, 255, .14), 0 10px 22px -12px rgba(0, 0, 0, .6), 0 0 0 0 rgba(228, 100, 52, 0); }
+    50%      { box-shadow: inset 0 0 0 .5px rgba(248, 153, 57, .6), inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .5), inset -1px -1.5px 0 -.5px rgba(255, 255, 255, .14), 0 10px 22px -12px rgba(0, 0, 0, .6), 0 0 16px 2px rgba(228, 100, 52, .25); }
 }
 
 /* ---------- Liquid glass bottom nav ("organic fluidity", iOS-style) ----------
@@ -135,15 +233,16 @@
     backdrop-filter: blur(3px) saturate(180%);
     filter: url(#nav-liquid-glass);
 }
-.nav-lg-tint { z-index: -2; background: linear-gradient(180deg, rgba(251, 251, 249, .14), rgba(21, 55, 65, .28) 55%, rgba(8, 32, 36, .38)); }
+.nav-lg-tint { z-index: -2; background: radial-gradient(90% 140% at var(--lg-x) var(--lg-y), rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 60%), linear-gradient(180deg, rgba(251, 251, 249, .12), rgba(21, 55, 65, .22) 55%, rgba(8, 32, 36, .32)); transition: --lg-x .3s ease-out, --lg-y .3s ease-out; }
 .nav-lg-rim {
     z-index: -1;
     box-shadow:
-        inset 1px 1px 0 rgba(255, 255, 255, .55),
-        inset -1px -1px 0 rgba(255, 255, 255, .14),
+        inset 0 0 0 .5px rgba(255, 255, 255, .22),
+        inset 1.5px 1.5px 0 -.5px rgba(255, 255, 255, .62),
+        inset -1px -1.5px 0 -.5px rgba(255, 255, 255, .18),
         inset 0 0 14px rgba(255, 255, 255, .10),
         inset 0 -10px 18px -12px rgba(248, 153, 57, .25);
-    border: 1px solid rgba(255, 255, 255, .14);
+    border: 0;
 }
 .nav-drop, .nav-drop--tail { background: #3E7680; }    /* solid: the goo filter needs opaque drops */
 .nav-glass-pill {                                        /* glass cap riding on the drop */
@@ -167,7 +266,7 @@
 
 /* ---------- Press feedback (touch, mouse and keyboard alike) ---------- */
 :is(.quiz-card-link, .quiz-start, .btn-arc, .bottom-nav a, .assign-chip, .builder-primary, .builder-secondary):active {
-    scale: .97;
+    scale: .96;
     transition: scale var(--mx-fast) ease;
 }
 
@@ -184,32 +283,40 @@
 @keyframes mx-page-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---------- Performance: pause what nobody can see ---------- */
-.mx-offscreen::after,
-.mx-paused :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::after,
 .mx-paused :is(.frost-orb, .frost-aurora),
-.mx-paused .nav-glass-pill { animation-play-state: paused; }
+.mx-paused .nav-glass-pill,
+.mx-paused .streak-pill.active { animation-play-state: paused; }
 
 /* Lite tier: phones, small screens and weaker devices (flagged in index.html) keep the frosted look
-   with a lighter blur and no drifting background, grain or light sweeps. */
+   with a lighter blur and no drifting background, grain or pointer light. */
 .mx-lite { --frost-blur: 12px; }
 .mx-lite :is(.frost-orb, .frost-aurora) { animation: none; }
 .mx-lite .frost-grain { display: none; }
-.mx-lite :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::after,
 .mx-lite .nav-lg-refract { filter: none; -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%); }
 .mx-lite .nav-glass-pill { animation: none !important; }
 @media (max-width: 760px) {
     :root { --frost-blur: 12px; }
     .frost-aurora, .frost-grain { display: none; }
     .frost-orb { filter: blur(50px); animation: none; }
-    :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::after,
     .nav-lg-refract { filter: none; -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%); }
 }
 
 /* Users who ask for less transparency get solid panes. */
 @media (prefers-reduced-transparency: reduce) {
-    .arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card, .streak-pill, .nav-lg-tint {
+    .arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card, .streak-pill, .nav-lg-tint, .btn-arc:not(.btn-arc--primary)::after {
         -webkit-backdrop-filter: none; backdrop-filter: none; background: #0d2c33;
     }
+    .btn-arc--primary::after, .quiz-start:not(.quiz-locked):not(:disabled) { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--orange); }
+    :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::after, .nav-lg-refract { display: none; }
+}
+
+/* Users who ask for more contrast get firm edges and no see-through. */
+@media (prefers-contrast: more) {
+    .arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card, .streak-pill, .btn-arc:not(.btn-arc--primary)::after {
+        background: #0d2c33; border: 1px solid rgba(255, 255, 255, .6);
+    }
+    .bottom-nav { border: 1px solid rgba(255, 255, 255, .6); }
+    :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::after { display: none; }
 }
 
 /* ---------- Loading: the shape of what is coming instead of a spinner ---------- */
@@ -231,10 +338,9 @@
 /* ---------- Reduced motion: keep the look, drop the movement ---------- */
 @media (prefers-reduced-motion: reduce) {
     .frost-orb--1, .frost-orb--2, .frost-aurora,
-    :is(.arc-card, .chart-card, .quiz-card, .empty-completed, .encounter-card)::after,
-    .skel, .nav-glass-pill { animation: none !important; }
+    .skel, .nav-glass-pill, .streak-pill.active { animation: none !important; }
     .nav-lg-refract { filter: none; }
-    :is(.arc-card, .chart-card, .quiz-card):hover, .quiz-card-link:focus-visible { transform: none; }
+    :is(.arc-card, .chart-card, .quiz-card):hover, .quiz-card-link:focus-visible, .btn-arc:hover, .quiz-start:hover, .quiz-card-link:hover .quiz-start { translate: none; scale: none; }
     .mx-js .mx-reveal:not(.mx-in) { opacity: 1; }
     .page-enter { animation: none; }
 }
