@@ -12,8 +12,7 @@ namespace Meridian.Api.Features.Quizzes;
 [Route("api/quizzes")]
 [Authorize]
 public sealed class QuizBuilderController(MeridianDbContext db, ILogger<QuizBuilderController> logger,
-    Meridian.Api.Features.Reports.ReportAccessService access, Meridian.Api.Features.Assignments.AssignmentService assignments,
-    Meridian.Api.Features.Assignments.AssignmentStore assignmentStore) : ControllerBase
+    Meridian.Api.Features.Reports.ReportAccessService access, Meridian.Api.Features.Assignments.AssignmentService assignments) : ControllerBase
 {
     [HttpPost]
     [RequestSizeLimit(2_000_000)]
