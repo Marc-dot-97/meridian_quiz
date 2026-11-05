@@ -23,6 +23,13 @@
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
+  <!-- Certificate of Completion images (Optimum branding), read by Features/Certificates/CertificatePdf.cs. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Certificates\optimum-logo.png" LogicalName="Meridian.Certificates.optimum-logo.png" />
+    <EmbeddedResource Include="Assets\Certificates\optimum-elephant-watermark.png" LogicalName="Meridian.Certificates.optimum-elephant-watermark.png" />
+    <None Remove="Assets\Certificates\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <Folder Include="Features\NewFolder\" />
   </ItemGroup>

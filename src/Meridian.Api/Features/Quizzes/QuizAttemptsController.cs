@@ -123,7 +123,10 @@ public sealed class QuizAttemptsController(MeridianDbContext db, Meridian.Api.Fe
     {
         var rows = await db.QuizAttempts.AsNoTracking().Include(a => a.Quiz).ThenInclude(q => q.Category)
             .Where(a => a.UserId == UserId && a.CompletedAt != null).OrderByDescending(a => a.CompletedAt).ToListAsync();
+        // Certificate = the latest passed attempt of each quiz (a later failed retake keeps the earlier certificate).
+        var certificates = rows.Where(a => a.Passed).GroupBy(a => a.QuizId).ToDictionary(g => g.Key, g => g.First().Id);
         return Ok(rows.GroupBy(a => a.QuizId).Select(g => g.First()).Select(a => new CompletedQuizDto(a.QuizId,
-            a.Quiz.Title, a.Quiz.Category.Name, (int)a.ScorePercent, DateTime.SpecifyKind(a.CompletedAt!.Value, DateTimeKind.Utc), a.CpdPointsEarned)).ToList());
+            a.Quiz.Title, a.Quiz.Category.Name, (int)a.ScorePercent, DateTime.SpecifyKind(a.CompletedAt!.Value, DateTimeKind.Utc), a.CpdPointsEarned,
+            certificates.TryGetValue(a.QuizId, out var certificate) ? certificate : null)).ToList());
     }
 }

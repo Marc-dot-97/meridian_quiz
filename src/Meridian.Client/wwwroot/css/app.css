@@ -1198,3 +1198,29 @@ button.btn-arc { border: 0; background: transparent; font-family: var(--font-bod
 
 /* Blazor's FocusOnNavigate puts focus on each page's <h1> for screen readers; it must not draw a focus box. */
 h1:focus, [tabindex="-1"]:focus { outline: none; }
+
+
+/* ===== Certificates of Completion (Results page, completed quizzes, Reports) ===== */
+.cert-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 22px; }
+.cert-actions .quiz-start, .cert-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 20px; text-decoration: none; font-size: .8rem; font-weight: 700; }
+.cert-btn {
+    border-radius: 999px; color: var(--white);
+    background: linear-gradient(180deg, rgba(251,251,249,.12), rgba(21,55,65,.3));
+    box-shadow: inset 0 0 0 .5px rgba(255,255,255,.3), inset 1.5px 1.5px 0 -.5px rgba(255,255,255,.55);
+    transition: background .2s ease;
+}
+.cert-btn:hover { background: linear-gradient(180deg, rgba(251,251,249,.18), rgba(21,55,65,.36)); color: var(--white); }
+.cert-links { display: flex; gap: 10px; margin-top: 4px; }
+.cert-links a, .cert-row-actions a { position: relative; z-index: 1; color: var(--muted-orange); font-size: .68rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.cert-links a:hover, .cert-row-actions a:hover { color: var(--white); text-decoration: underline; }
+.cert-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 6px 0 14px; }
+.cert-filters select.auth-input { width: auto; flex: 0 1 240px; }
+.cert-filters input.auth-input { flex: 1 1 260px; width: auto; }
+.cert-filters .quiz-start { min-height: 42px; }
+.cert-table-wrap { overflow-x: auto; }
+.cert-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.cert-table th { text-align: left; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-orange); padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.12); white-space: nowrap; }
+.cert-table td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,.06); color: var(--earth-grey); vertical-align: top; }
+.cert-table td:first-child { color: var(--white); font-weight: 600; }
+.cert-table .cert-no { font-family: ui-monospace, Consolas, monospace; font-size: .74rem; white-space: nowrap; }
+.cert-row-actions { display: flex; gap: 12px; }

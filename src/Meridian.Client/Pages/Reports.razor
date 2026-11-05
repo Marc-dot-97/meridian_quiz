@@ -82,6 +82,70 @@
             </button>
         </section>
 
+        @if (_access.CanChooseDepartment)
+        {
+            @* Certificates of Completion for people in my scope (SuperAdmin/HR: everyone, line managers: their departments). *@
+            <section class="encounter-card report-card">
+                <div class="encounter-eyebrow">@RoleLabel</div>
+                <h2 class="report-title">Certificates</h2>
+                <p class="detail-copy">Certificates of Completion for passed quizzes. Search by name, email, quiz or certificate number.</p>
+                <div class="cert-filters">
+                    @if (_access.Departments.Count > 1)
+                    {
+                        <select class="auth-input" @bind="_certDepartment">
+                            <option value="all">@(_access.Role == "LineManager" ? "All my departments" : "All departments")</option>
+                            @foreach (var d in _access.Departments)
+                            {
+                                <option value="@d">@d</option>
+                            }
+                        </select>
+                    }
+                    <input class="auth-input" type="search" placeholder="Name, email, quiz or certificate no." @bind="_certSearch" @bind:event="oninput" @onkeydown="CertificateKeyAsync" />
+                    <button class="quiz-start" type="button" disabled="@_certBusy" @onclick="LoadCertificatesAsync">@(_certBusy ? "Searching…" : "Find")</button>
+                </div>
+                @if (_certError is not null)
+                {
+                    <div class="auth-error">@_certError</div>
+                }
+                else if (_certificates is not null)
+                {
+                    @if (_certificates.Count == 0)
+                    {
+                        <p class="detail-copy">No certificates found.</p>
+                    }
+                    else
+                    {
+                        <div class="cert-table-wrap">
+                            <table class="cert-table">
+                                <thead><tr><th>Name</th><th>Department</th><th>Quiz</th><th>Completed</th><th>Score</th><th>Certificate no.</th><th></th></tr></thead>
+                                <tbody>
+                                    @foreach (var c in _certificates)
+                                    {
+                                        <tr>
+                                            <td>@c.Name</td>
+                                            <td>@c.Department</td>
+                                            <td>@c.QuizTitle</td>
+                                            <td>@c.CompletedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                            <td>@c.ScorePercent%</td>
+                                            <td class="cert-no">@c.CertificateNumber</td>
+                                            <td class="cert-row-actions">
+                                                <a href="@($"api/certificates/{c.AttemptId}")" target="_blank" rel="noopener">View</a>
+                                                <a href="@($"api/certificates/{c.AttemptId}?download=true")" download target="_blank" rel="noopener">PDF</a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (_certificates.Count >= 500)
+                        {
+                            <p class="detail-copy">Showing the newest 500. Narrow the search to find older certificates.</p>
+                        }
+                    }
+                }
+            </section>
+        }
+
         @if (_access.CanImportDirectory)
         {
             <section class="encounter-card report-card">
@@ -132,6 +196,32 @@
     private string _department = "all";
     private string _include = "both";
 
+    // Certificates (managers, HR, SuperAdmin)
+    private List<CertificateListItemDto>? _certificates;
+    private string _certDepartment = "all", _certSearch = "";
+    private string? _certError;
+    private bool _certBusy;
+
+    private async Task LoadCertificatesAsync()
+    {
+        if (_certBusy) return;
+        _certBusy = true; _certError = null;
+        try
+        {
+            var url = $"api/certificates/team?department={Uri.EscapeDataString(_certDepartment)}&search={Uri.EscapeDataString(_certSearch.Trim())}";
+            using var response = await Http.GetAsync(url);
+            if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response);
+            _certificates = await response.Content.ReadFromJsonAsync<List<CertificateListItemDto>>() ?? [];
+        }
+        catch (Exception ex) { _certError = ex.Message; }
+        finally { _certBusy = false; }
+    }
+
+    private async Task CertificateKeyAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await LoadCertificatesAsync();
+    }
+
     private string RoleLabel => _access?.Role switch
     {
         "SuperAdmin" => "SuperAdmin",
@@ -154,6 +244,7 @@
         {
             _access = await Http.GetFromJsonAsync<ReportAccessDto>("api/reports/access");
             if (_access?.CanImportDirectory == true) await LoadDirectoryAsync();
+            if (_access?.CanChooseDepartment == true) await LoadCertificatesAsync();
         }
         catch (Exception ex) { _error = ex.Message; }
         finally { _loading = false; }

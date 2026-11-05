@@ -58,7 +58,14 @@
 
             </div>
 
-
+            @if (_result.Passed)
+            {
+                @* Certificate of Completion: opens in a new tab (view) or saves the PDF (download). *@
+                <div class="cert-actions">
+                    <a class="quiz-start" href="@CertificateUrl" target="_blank" rel="noopener">View certificate</a>
+                    <a class="cert-btn" href="@($"{CertificateUrl}?download=true")" download target="_blank" rel="noopener">Download PDF</a>
+                </div>
+            }
 
         </section>
 
@@ -71,6 +78,7 @@
     private CompleteAttemptResponse? _result;
     private bool _loading = true;
     private string? _error;
+    private string CertificateUrl => $"api/certificates/{AttemptId}";
     protected override async Task OnParametersSetAsync()
     {
         _loading = true; _error = null; _result = null;

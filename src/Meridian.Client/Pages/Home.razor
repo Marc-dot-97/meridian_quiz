@@ -281,6 +281,14 @@
                                             +@quiz.CpdPointsEarned CPD
                                         </span>
 
+                                        @if (quiz.CertificateAttemptId is Guid certificate)
+                                        {
+                                            <div class="cert-links">
+                                                <a href="@($"api/certificates/{certificate}")" target="_blank" rel="noopener" title="View certificate">Certificate</a>
+                                                <a href="@($"api/certificates/{certificate}?download=true")" download target="_blank" rel="noopener" title="Download certificate (PDF)">PDF</a>
+                                            </div>
+                                        }
+
                                     </div>
 
                                 </div>

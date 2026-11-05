@@ -276,6 +276,8 @@ public static class PdfReportBuilder
 public sealed class MeridianFontResolver : IFontResolver
 {
     public const string Family = "Meridian Sans";
+    /// <summary>Certificates use Trebuchet MS (Optimum's digital brand font); falls back to the report font when it is missing.</summary>
+    public const string CertificateFamily = "Meridian Certificate";
     private readonly Dictionary<string, string> _files = new();
 
     public MeridianFontResolver()
@@ -301,10 +303,19 @@ public sealed class MeridianFontResolver : IFontResolver
         _files["B"] = Find("arialbd.ttf", "Arial Bold.ttf", "DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf") ?? regular;
         _files["I"] = Find("ariali.ttf", "Arial Italic.ttf", "DejaVuSans-Oblique.ttf", "LiberationSans-Italic.ttf") ?? regular;
         _files["BI"] = Find("arialbi.ttf", "Arial Bold Italic.ttf", "DejaVuSans-BoldOblique.ttf", "LiberationSans-BoldItalic.ttf") ?? _files["B"];
+        // Certificate faces (Trebuchet MS ships with Windows); empty = use the matching report face.
+        _files["TR"] = Find("trebuc.ttf", "Trebuchet MS.ttf") ?? "";
+        _files["TB"] = Find("trebucbd.ttf", "Trebuchet MS Bold.ttf") ?? "";
+        _files["TI"] = Find("trebucit.ttf", "Trebuchet MS Italic.ttf") ?? "";
+        _files["TBI"] = Find("trebucbi.ttf", "Trebuchet MS Bold Italic.ttf") ?? "";
     }
 
-    public FontResolverInfo? ResolveTypeface(string familyName, bool bold, bool italic) =>
-        new(bold && italic ? "BI" : bold ? "B" : italic ? "I" : "R");
+    public FontResolverInfo? ResolveTypeface(string familyName, bool bold, bool italic)
+    {
+        var style = bold && italic ? "BI" : bold ? "B" : italic ? "I" : "R";
+        if (familyName == CertificateFamily && _files.TryGetValue("T" + style, out var t) && t.Length > 0) return new("T" + style);
+        return new(style);
+    }
 
     public byte[]? GetFont(string faceName)
     {

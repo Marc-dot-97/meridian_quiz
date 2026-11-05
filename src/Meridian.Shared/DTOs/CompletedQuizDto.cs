@@ -6,4 +6,6 @@ public sealed record CompletedQuizDto(
     string Category,
     int ScorePercent,
     DateTime CompletedAt,
-    decimal CpdPointsEarned);
+    decimal CpdPointsEarned,
+    // Latest PASSED attempt of this quiz, for the Certificate of Completion (null = not passed yet).
+    Guid? CertificateAttemptId = null);
