@@ -28,6 +28,7 @@ $super  = Read-Host 'SuperAdmin emails, comma separated (Enter = marc@optimumgro
 if (-not $super) { $super = 'marc@optimumgroup.co.za' }
 $hr     = Read-Host 'HR emails, comma separated (Enter to leave empty for now)'
 $keys   = 'C:\inetpub\apps\Meridian-data\keys'
+$videos = 'C:\inetpub\apps\Meridian-data\quiz-videos'   # Watch first module videos (kept outside the site folder)
 
 if (-not $dbPw -or -not $secret) { throw 'Both passwords/secrets are required.' }
 if ($dbPw -match '[;=''"\s]') { throw 'The MySQL password contains ; = quote or a space - it would break the connection string. Use letters, digits, - or _.' }
@@ -35,6 +36,8 @@ if ($secret -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-') { throw 'That looks like a
 
 New-Item -ItemType Directory -Force -Path $keys | Out-Null
 icacls $keys /grant "IIS AppPool\${pool}:(OI)(CI)M" | Out-Null
+New-Item -ItemType Directory -Force -Path $videos | Out-Null
+icacls $videos /grant "IIS AppPool\${pool}:(OI)(CI)M" | Out-Null
 
 $vars = [ordered]@{
   'ASPNETCORE_ENVIRONMENT'      = 'Production'
@@ -47,6 +50,7 @@ $vars = [ordered]@{
   'AzureAd__ClientId'           = $clientId
   'AzureAd__ClientSecret'       = $secret
   'DataProtection__KeysPath'    = $keys
+  'Videos__Folder'              = $videos
 }
 $i = 0; foreach ($e in ($super -split '[,;\s]+' | Where-Object { $_ })) { $vars["Reports__SuperAdminEmails__$i"] = $e.Trim(); $i++ }
 $i = 0; foreach ($e in ($hr    -split '[,;\s]+' | Where-Object { $_ })) { $vars["Reports__HrEmails__$i"]         = $e.Trim(); $i++ }

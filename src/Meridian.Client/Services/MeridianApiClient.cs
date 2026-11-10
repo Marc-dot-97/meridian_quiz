@@ -95,7 +95,7 @@ public sealed partial class MeridianApiClient
             }
 
             var questions = BuildLocalQuestions(quizId).OrderBy(_ => Random.Shared.Next()).ToList();
-            questions = questions.Select((q, i) => q with { Question = q.Question with { DisplayOrder = i + 1 } }).ToList();
+            questions = questions.Select((q, i) => q with { Question = q.Question with { DisplayOrder = i + 1, Options = q.Question.Options.OrderBy(_ => Random.Shared.Next()).ToList() } }).ToList();
             var id = Guid.NewGuid();
             _attempts[id] = new MockAttempt(quizId, questions);
             return new StartAttemptResponse(id, questions.Count, questions[0].Question);

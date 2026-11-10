@@ -1,0 +1,18 @@
+
+/* ===== "Watch first" module video (quiz details page) ===== */
+.watch-first { margin: 18px 0 6px; padding: 18px; border-radius: 18px; background: rgba(8,32,36,.45); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+.watch-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.watch-head .encounter-eyebrow { margin: 0; }
+.watch-state { font-size: .72rem; font-weight: 700; color: var(--muted-orange); padding: 4px 10px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(248,153,57,.5); }
+.watch-state.is-done { color: #8fd9a8; box-shadow: inset 0 0 0 1px rgba(143,217,168,.55); }
+.watch-video { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; background: #000; }
+.watch-help { margin: 10px 0 0; font-size: .82rem; }
+.watch-manage { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); }
+.watch-manage-label { flex: 1 1 260px; font-size: .78rem; color: var(--earth-grey); overflow-wrap: anywhere; }
+.watch-upload { position: relative; cursor: pointer; }
+.watch-upload input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.watch-remove { font-size: .78rem; opacity: .85; }
+span.quiz-start.quiz-locked { display: flex; align-items: center; justify-content: center; text-align: center; cursor: not-allowed; }
+.watch-locked { color: var(--muted-orange); }
+.watch-order { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; font-size: .78rem; color: var(--earth-grey); }
+.watch-order select { flex: 1 1 240px; min-height: 36px; padding: 6px 10px; border-radius: 10px; color: inherit; background: rgba(8,32,36,.6); border: 1px solid rgba(255,255,255,.18); }

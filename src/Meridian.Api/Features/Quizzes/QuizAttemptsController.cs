@@ -10,7 +10,7 @@ namespace Meridian.Api.Features.Quizzes;
 
 [ApiController, Authorize, Route("api/quiz-attempts")]
 public sealed class QuizAttemptsController(MeridianDbContext db, Meridian.Api.Features.Assignments.AssignmentService assignments,
-    Meridian.Api.Features.Assignments.AssignmentStore assignmentStore) : ControllerBase
+    Meridian.Api.Features.Assignments.AssignmentStore assignmentStore, Meridian.Api.Features.Videos.QuizVideoGate videoGate) : ControllerBase
 {
     private ulong UserId => ulong.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     public sealed record SnapshotQuestion(QuestionDto Question, ulong CorrectOptionId);
@@ -37,21 +37,43 @@ public sealed class QuizAttemptsController(MeridianDbContext db, Meridian.Api.Fe
         if (quiz.AvailableFrom.HasValue && !QuizAvailability.IsUnlocked(quiz.AvailableFrom.Value))
             return BadRequest(new { message = "This quiz is not available yet." });
         if (QuizAvailability.IsExpired(quiz.ExpiresAt)) return BadRequest(new { message = "This quiz has expired." });
-        var selected = quiz.QuizQuestions.Where(q => q.IsActive == true)
-            .OrderBy(_ => Random.Shared.Next()).Take(quiz.QuestionsPerAttempt).Select(q => q.Question).ToList();
-        if (selected.Count == 0 || selected.Count != quiz.QuestionsPerAttempt
-            || selected.Any(q => q.AnswerOptions.Count < 2 || q.AnswerOptions.Count(o => o.IsCorrect) != 1))
-            return BadRequest(new { message = "Quiz questions are incomplete. Ask a quiz author to check the quiz." });
-        var questions = selected.Select((q, i) => new SnapshotQuestion(new QuestionDto(q.Id, i + 1, q.QuestionText,
-            q.AnswerOptions.OrderBy(o => o.DisplayOrder).Select(o => new AnswerOptionDto(o.Id, o.OptionText)).ToList()),
-            q.AnswerOptions.Single(o => o.IsCorrect).Id)).ToList();
-        var now = DateTime.UtcNow;
-        var attempt = new QuizAttempt { Id = Guid.NewGuid(), UserId = UserId, QuizId = quiz.Id,
-            Status = 1, StartedAt = now, CreatedAt = now, UpdatedAt = now, TotalQuestions = (ushort)questions.Count,
-            QuestionsJson = JsonSerializer.Serialize(questions), AnswersJson = "[]", SnapshotPassMark = quiz.PassMarkPercent,
-            SnapshotCpdPoints = quiz.CpdPoints, SnapshotTimeLimitMinutes = quiz.TimeLimitMinutes };
-        db.QuizAttempts.Add(attempt); await db.SaveChangesAsync();
-        return Ok(new StartAttemptResponse(attempt.Id, questions.Count, questions[0].Question));
+        if (await videoGate.StartBlockAsync(UserId, quiz.Id, HttpContext.RequestAborted) is { } videoBlock)
+            return BadRequest(new { message = videoBlock });
+        // One click can reach the server twice (the page can start before it has settled). Serialise starts per person and quiz,
+        // and hand back an attempt they started moments ago with nothing answered, instead of leaving an unfinished duplicate.
+        var ct = HttpContext.RequestAborted;
+        var lockName = $"meridian-start-{UserId}-{quiz.Id}";
+        await db.Database.OpenConnectionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync("SELECT GET_LOCK({0}, 10)", [lockName], ct);
+        try
+        {
+            var recentSince = DateTime.UtcNow.AddMinutes(-2);
+            var recent = await db.QuizAttempts.AsNoTracking()
+                .Where(x => x.UserId == UserId && x.QuizId == quiz.Id && x.CompletedAt == null && x.StartedAt > recentSince && x.AnswersJson == "[]")
+                .OrderByDescending(x => x.StartedAt).FirstOrDefaultAsync(ct);
+            if (recent is not null && Questions(recent) is { Count: > 0 } existing)
+                return Ok(new StartAttemptResponse(recent.Id, existing.Count, existing[0].Question));
+            var selected = quiz.QuizQuestions.Where(q => q.IsActive == true)
+                .OrderBy(_ => Random.Shared.Next()).Take(quiz.QuestionsPerAttempt).Select(q => q.Question).ToList();
+            if (selected.Count == 0 || selected.Count != quiz.QuestionsPerAttempt
+                || selected.Any(q => q.AnswerOptions.Count < 2 || q.AnswerOptions.Count(o => o.IsCorrect) != 1))
+                return BadRequest(new { message = "Quiz questions are incomplete. Ask a quiz author to check the quiz." });
+            var questions = selected.Select((q, i) => new SnapshotQuestion(new QuestionDto(q.Id, i + 1, q.QuestionText,
+                // Answers in a fresh random order for every attempt (the import stores the correct answer first).
+                q.AnswerOptions.OrderBy(_ => Random.Shared.Next()).Select(o => new AnswerOptionDto(o.Id, o.OptionText)).ToList()),
+                q.AnswerOptions.Single(o => o.IsCorrect).Id)).ToList();
+            var now = DateTime.UtcNow;
+            var attempt = new QuizAttempt { Id = Guid.NewGuid(), UserId = UserId, QuizId = quiz.Id,
+                Status = 1, StartedAt = now, CreatedAt = now, UpdatedAt = now, TotalQuestions = (ushort)questions.Count,
+                QuestionsJson = JsonSerializer.Serialize(questions), AnswersJson = "[]", SnapshotPassMark = quiz.PassMarkPercent,
+                SnapshotCpdPoints = quiz.CpdPoints, SnapshotTimeLimitMinutes = quiz.TimeLimitMinutes };
+            db.QuizAttempts.Add(attempt); await db.SaveChangesAsync();
+            return Ok(new StartAttemptResponse(attempt.Id, questions.Count, questions[0].Question));
+        }
+        finally
+        {
+            await db.Database.ExecuteSqlRawAsync("SELECT RELEASE_LOCK({0})", [lockName], CancellationToken.None);
+        }
     }
 
     // FOR UPDATE serializes retries and simultaneous submissions across API instances.

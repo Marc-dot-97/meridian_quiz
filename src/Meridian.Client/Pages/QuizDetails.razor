@@ -1,6 +1,9 @@
 @page "/quizzes/{QuizId:long}"
 @attribute [Authorize]
+@implements IDisposable
 @inject MeridianApiClient Api
+@inject HttpClient Http
+@inject IJSRuntime JS
 
 <PageTitle>Meridian | Quiz details</PageTitle>
 
@@ -64,7 +67,7 @@
                     <div>
                         <span>Time</span>
                         <strong>
-                            @_quiz.TimeLimitMinutes min
+                            @(_quiz.TimeLimitMinutes is null ? "No limit" : $"{_quiz.TimeLimitMinutes} min")
                         </strong>
                     </div>
 
@@ -74,6 +77,77 @@
                     <strong>Instructions:</strong>
                     @_quiz.Instructions
                 </p>
+
+                @* "Watch first": the module video has to be watched to the end (once) before the quiz can start.
+                   It can open only after an earlier quiz is passed, and is hidden while an attempt on this quiz is open. *@
+                @if (_video is not null && (_video.HasVideo || _video.CanManage))
+                {
+                    <div class="watch-first">
+                        <div class="watch-head">
+                            <span class="encounter-eyebrow">Watch first</span>
+                            @if (_video.HasVideo)
+                            {
+                                <span class="watch-state @(_video.Completed ? "is-done" : "")">@(_video.Completed ? "Watched ✓" : _video.Locked ? "Locked" : "Required before the quiz")</span>
+                            }
+                        </div>
+                        @if (_video.HasVideo && _video.InQuiz)
+                        {
+                            <p class="detail-copy watch-help" role="status">You have this quiz open. The video is hidden until you finish the quiz.</p>
+                        }
+                        else if (_video.HasVideo && _video.Locked && !_video.CanManage)
+                        {
+                            <p class="detail-copy watch-help watch-locked" role="status">Pass “@_video.UnlockAfterTitle” first to unlock this video.</p>
+                        }
+                        else if (_video.HasVideo)
+                        {
+                            <video @ref="_videoEl" @key="VideoUrl" class="watch-video" controls preload="metadata" playsinline
+                                   controlslist="nodownload noplaybackrate" disablepictureinpicture src="@VideoUrl"></video>
+                            @if (_video.Locked)
+                            {
+                                <p class="detail-copy watch-help">Preview only: you haven't passed “@_video.UnlockAfterTitle” yet, so this quiz stays locked for you.</p>
+                            }
+                            else if (!_video.Completed)
+                            {
+                                <p class="detail-copy watch-help">Watch the video to the end to unlock the quiz. You only have to watch it once. You can pause and rewind, but you can't skip ahead.</p>
+                            }
+                            else
+                            {
+                                <p class="detail-copy watch-help">You've watched this video. Replay it any time to revise, just not while the quiz is open.</p>
+                            }
+                        }
+                        @if (_video.CanManage)
+                        {
+                            <div class="watch-manage">
+                                <span class="watch-manage-label">@(_video.HasVideo ? $"Video: {_video.OriginalName} ({SizeLabel(_video.SizeBytes)})" : "No video yet. Add an MP4 that people must watch before starting this quiz.")</span>
+                                <label class="cert-btn watch-upload">
+                                    @(_uploading ? $"Uploading… {_uploadPercent}%" : _video.HasVideo ? "Replace video" : "Add video (MP4)")
+                                    <InputFile accept="video/mp4,.mp4" OnChange="UploadAsync" disabled="@_uploading" @key="_uploadKey" />
+                                </label>
+                                @if (_video.HasVideo && !_uploading)
+                                {
+                                    <button type="button" class="cert-btn watch-remove" @onclick="RemoveAsync">Remove video</button>
+                                }
+                            </div>
+                            @if (_video.HasVideo)
+                            {
+                                <label class="watch-order">
+                                    <span>Unlocks after passing</span>
+                                    <select value="@(_video.UnlockAfterQuizId?.ToString() ?? "")" @onchange="SetUnlockAfterAsync">
+                                        <option value="">Nothing: open straight away</option>
+                                        @foreach (var q in _otherQuizzes)
+                                        {
+                                            <option value="@q.Id">@q.Title</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                            @if (_videoMessage is not null)
+                            {
+                                <p class="detail-copy" role="status">@_videoMessage</p>
+                            }
+                        }
+                    </div>
+                }
 
             </div>
 
@@ -85,13 +159,21 @@
             {
                 <p class="detail-copy" role="status">This quiz has expired. No new attempts can be started.</p>
             }
-            else if (QuizAvailability.IsUnlocked(_quiz.AvailableFrom))
+            else if (!QuizAvailability.IsUnlocked(_quiz.AvailableFrom))
             {
-                <a class="quiz-start full-action" href="@($"quiz/{_quiz.Id}/take")">Start quiz</a>
+                <p class="detail-copy" role="status">Unlocks @QuizAvailability.Display(_quiz.AvailableFrom!.Value)</p>
+            }
+            else if (_video is { HasVideo: true, Locked: true })
+            {
+                <span class="quiz-start full-action quiz-locked" aria-disabled="true">Pass “@_video.UnlockAfterTitle” to unlock</span>
+            }
+            else if (MustWatch)
+            {
+                <span class="quiz-start full-action quiz-locked" aria-disabled="true">Watch the video to unlock the quiz</span>
             }
             else
             {
-                <p class="detail-copy" role="status">Unlocks @QuizAvailability.Display(_quiz.AvailableFrom!.Value)</p>
+                <a class="quiz-start full-action" href="@($"quiz/{_quiz.Id}/take")">Start quiz</a>
             }
 
         </section>
@@ -105,10 +187,19 @@
     public long QuizId { get; set; }
 
     private QuizDetailsDto? _quiz;
+    private QuizVideoDto? _video;
+    private ElementReference _videoEl;
+    private DotNetObjectReference<QuizDetails>? _self;
+    private string? _attachedTo;
+    private bool _loading = true, _uploading;
+    private int _uploadPercent;
+    private int _uploadKey;
+    private string? _error, _videoMessage;
+    private IReadOnlyList<QuizSummaryDto> _otherQuizzes = [];
 
-    private bool _loading = true;
-
-    private string? _error;
+    private bool MustWatch => _video is { HasVideo: true, Completed: false };
+    private bool ShowPlayer => _video is { HasVideo: true, InQuiz: false } && (!_video.Locked || _video.CanManage);
+    private string VideoUrl => $"api/quizzes/{QuizId}/video/file?v={_video?.UploadedAt?.Ticks}";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -116,6 +207,7 @@
         {
             _quiz = await Api.GetQuizAsync(
                 (ulong)QuizId);
+            await LoadVideoAsync();
         }
         catch (Exception ex)
         {
@@ -126,4 +218,106 @@
             _loading = false;
         }
     }
+
+    private async Task LoadVideoAsync()
+    {
+        try { _video = await Http.GetFromJsonAsync<QuizVideoDto>($"api/quizzes/{QuizId}/video"); }
+        catch { _video = null; }   // older server or local mode: no video panel, quiz works as before
+        if (_video?.CanManage == true && _otherQuizzes.Count == 0)
+        {
+            try { _otherQuizzes = (await Api.GetQuizzesAsync()).Where(q => q.Id != (ulong)QuizId).OrderBy(q => q.Title).ToList(); }
+            catch { _otherQuizzes = []; }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (ShowPlayer && _attachedTo != VideoUrl && _videoEl.Context is not null)
+        {
+            _attachedTo = VideoUrl;
+            _self ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("meridianVideo.attach", _videoEl, _self, _video!.MaxPosition, _video.Completed);
+        }
+    }
+
+    [JSInvokable]
+    public async Task<VideoProgressResponse?> OnVideoProgress(decimal position, decimal duration, bool ended)
+    {
+        try
+        {
+            using var response = await Http.PostAsJsonAsync($"api/quizzes/{QuizId}/video/progress", new VideoProgressRequest(position, duration, ended));
+            if (!response.IsSuccessStatusCode) return null;
+            var result = await response.Content.ReadFromJsonAsync<VideoProgressResponse>();
+            if (result is not null && _video is not null && result.Completed != _video.Completed)
+            {
+                _video = _video with { Completed = result.Completed, MaxPosition = result.MaxPosition };
+                StateHasChanged();
+            }
+            return result;
+        }
+        catch { return null; }
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        if (_video is null || _uploading) return;
+        _uploading = true; _uploadPercent = 0; _videoMessage = null;
+        try
+        {
+            var file = e.File;
+            if (file.Size > 1024L * 1024 * 1024) throw new InvalidOperationException("Videos must be 1 GB or smaller.");
+            var chunk = _video.ChunkBytes > 0 ? _video.ChunkBytes : 8 * 1024 * 1024;
+            var total = (int)Math.Max(1, (file.Size + chunk - 1) / chunk);
+            var uploadId = Guid.NewGuid();
+            await using var stream = file.OpenReadStream(1024L * 1024 * 1024);
+            var buffer = new byte[chunk];
+            for (var index = 0; index < total; index++)
+            {
+                var read = 0;
+                while (read < chunk) { var n = await stream.ReadAsync(buffer.AsMemory(read, chunk - read)); if (n == 0) break; read += n; }
+                using var content = new ByteArrayContent(buffer, 0, read);
+                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+                var url = $"api/quizzes/{QuizId}/video/upload?uploadId={uploadId}&index={index}&total={total}&name={Uri.EscapeDataString(file.Name)}";
+                using var response = await Http.PostAsync(url, content);
+                if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response);
+                _uploadPercent = (int)((index + 1) * 100L / total);
+                StateHasChanged();
+            }
+            await LoadVideoAsync();
+            _videoMessage = "Video saved. Everyone now has to watch it before starting this quiz.";
+        }
+        catch (Exception ex) { _videoMessage = ex.Message; }
+        finally { _uploading = false; _uploadKey++; }
+    }
+
+    private async Task RemoveAsync()
+    {
+        try
+        {
+            using var response = await Http.DeleteAsync($"api/quizzes/{QuizId}/video");
+            if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response);
+            await LoadVideoAsync();
+            _attachedTo = null;
+            _videoMessage = "Video removed. The quiz can be started without watching anything.";
+        }
+        catch (Exception ex) { _videoMessage = ex.Message; }
+    }
+
+    private async Task SetUnlockAfterAsync(ChangeEventArgs e)
+    {
+        _videoMessage = null;
+        ulong? before = ulong.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        try
+        {
+            using var response = await Http.PutAsJsonAsync($"api/quizzes/{QuizId}/video/unlock-after", new VideoUnlockRequest(before));
+            if (!response.IsSuccessStatusCode) throw await ApiRequestException.FromResponseAsync(response);
+            _video = await response.Content.ReadFromJsonAsync<QuizVideoDto>() ?? _video;
+            _videoMessage = before is null ? "This video now opens straight away." : $"This video now opens once “{_video?.UnlockAfterTitle}” is passed.";
+        }
+        catch (Exception ex) { _videoMessage = ex.Message; await LoadVideoAsync(); }
+    }
+
+    private static string SizeLabel(long? bytes) => bytes is null ? "" : $"{bytes.Value / 1024d / 1024d:0.#} MB";
+
+    public void Dispose() => _self?.Dispose();
 }

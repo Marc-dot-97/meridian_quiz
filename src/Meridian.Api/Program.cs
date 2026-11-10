@@ -117,6 +117,14 @@ builder.Services.AddScoped<Meridian.Api.Features.Reports.ReportAccessService>();
 var assignmentStore = new Meridian.Api.Features.Assignments.AssignmentStore(connectionString);
 builder.Services.AddSingleton(assignmentStore);
 builder.Services.AddScoped<Meridian.Api.Features.Assignments.AssignmentService>();
+// Watch first: module videos that must be watched to the end before a quiz can start.
+var quizVideoStore = new Meridian.Api.Features.Videos.QuizVideoStore(connectionString);
+builder.Services.AddSingleton(quizVideoStore);
+var videoFolder = builder.Configuration["Videos:Folder"];
+if (string.IsNullOrWhiteSpace(videoFolder)) videoFolder = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "quiz-videos");
+Directory.CreateDirectory(videoFolder);
+builder.Services.AddSingleton(new Meridian.Api.Features.Videos.QuizVideoFiles(videoFolder));
+builder.Services.AddScoped<Meridian.Api.Features.Videos.QuizVideoGate>();
 PdfSharp.Fonts.GlobalFontSettings.FontResolver = new Meridian.Api.Features.Reports.MeridianFontResolver();
 if (builder.Environment.IsProduction())
 {
@@ -137,6 +145,7 @@ await using (var scope = app.Services.CreateAsyncScope())
     await assignmentStore.EnsureSchemaAsync();
     await Meridian.Api.Features.Retention.RetentionMaintenance.EnsureSchemaAsync(connectionString);
     await directoryStore.EnsureSchemaAsync();
+    await quizVideoStore.EnsureSchemaAsync();
     // Survey anonymity: split table + one-off copy of existing responses (idempotent).
     await Meridian.Api.Features.Surveys.SurveyAnonymity.EnsureSchemaAsync(connectionString);
     await Meridian.Api.Features.Surveys.SurveyAnonymity.BackfillAsync(db, directoryStore, app.Logger);
